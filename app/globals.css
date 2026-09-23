@@ -1,0 +1,171 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: #07090d; }
+
+.icon-button {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 999px;
+  background: rgba(255,255,255,.04);
+  color: #d4d4d8;
+  transition: .2s ease;
+}
+.icon-button:hover { background: rgba(255,255,255,.1); color: white; }
+
+.logo-mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #22d3ee;
+  color: #000;
+  font-weight: 900;
+  box-shadow: 0 0 30px rgba(34,211,238,.2);
+}
+
+.hero-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 390px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 75% 20%, rgba(34,211,238,.25), transparent 28%),
+    radial-gradient(circle at 30% 65%, rgba(59,130,246,.18), transparent 30%),
+    linear-gradient(135deg, #111827 0%, #090c12 55%, #05070a 100%);
+}
+.hero-card:before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: linear-gradient(to bottom, black, transparent);
+}
+.hero-glow {
+  position: absolute;
+  right: 12%;
+  top: 14%;
+  width: 170px;
+  height: 170px;
+  border-radius: 50%;
+  border: 1px solid rgba(34,211,238,.3);
+  box-shadow: 0 0 80px rgba(34,211,238,.15), inset 0 0 60px rgba(34,211,238,.08);
+}
+
+.tag {
+  width: fit-content;
+  border: 1px solid rgba(34,211,238,.3);
+  border-radius: 999px;
+  background: rgba(34,211,238,.1);
+  padding: 7px 11px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #67e8f9;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.news-card {
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 22px;
+  background: #0d1118;
+  transition: transform .2s ease, border-color .2s ease;
+}
+.news-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(34,211,238,.3);
+}
+.news-image {
+  position: relative;
+  height: 190px;
+  display: flex;
+  align-items: flex-end;
+  padding: 16px;
+  background:
+    radial-gradient(circle at 75% 25%, rgba(34,211,238,.28), transparent 20%),
+    linear-gradient(135deg, #18202d, #080b10);
+}
+.news-image:after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(135deg, transparent 0 16px, rgba(255,255,255,.025) 16px 17px);
+}
+.news-image span {
+  position: relative;
+  z-index: 1;
+  border-radius: 999px;
+  background: rgba(0,0,0,.45);
+  padding: 7px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #a5f3fc;
+}
+
+.newsletter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 25px;
+  border: 1px solid rgba(34,211,238,.2);
+  border-radius: 26px;
+  padding: 28px;
+  background: linear-gradient(110deg, rgba(34,211,238,.09), rgba(255,255,255,.025));
+}
+@media (max-width: 700px) {
+  .newsletter { flex-direction: column; align-items: flex-start; }
+}
+.article-hero {
+  position: relative;
+  height: 360px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 70% 35%, rgba(34, 211, 238, 0.3), transparent 22%),
+    radial-gradient(circle at 30% 70%, rgba(59, 130, 246, 0.2), transparent 28%),
+    linear-gradient(135deg, #111827, #07090d);
+}
+
+.article-hero-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 42px 42px;
+}
+
+.article-orb {
+  position: absolute;
+  right: 15%;
+  top: 18%;
+  width: 180px;
+  height: 180px;
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  border-radius: 50%;
+  box-shadow:
+    0 0 80px rgba(34, 211, 238, 0.18),
+    inset 0 0 60px rgba(34, 211, 238, 0.08);
+}
+
+@media (max-width: 640px) {
+  .article-hero {
+    height: 260px;
+  }
+
+  .article-orb {
+    width: 120px;
+    height: 120px;
+  }
+}
