@@ -1,6 +1,24 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { ArrowLeft, ArrowRight, Search } from "lucide-react";
 import { supabase } from "../../lib/supabase/server";
+
+export const metadata: Metadata = {
+  title: "Search Technology News",
+
+  description:
+    "Search TechHunt for the latest technology, AI, startup, gadget, cybersecurity, software and research stories.",
+
+  robots: {
+    index: false,
+    follow: true,
+
+    googleBot: {
+      index: false,
+      follow: true,
+    },
+  },
+};
 
 export default async function SearchPage({
   searchParams,

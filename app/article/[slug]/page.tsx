@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { ArrowLeft } from "lucide-react";
 import ShareButton from "./ShareButton";
 import { supabase } from "../../../lib/supabase/server";
@@ -8,6 +9,132 @@ type ArticlePageProps = {
     slug: string;
   };
 };
+
+const siteUrl = "https://tech-hunt-iota.vercel.app";
+
+async function getArticle(slug: string) {
+  const { data: article, error } = await supabase
+    .from("articles")
+    .select("*")
+    .eq("slug", slug)
+    .eq("status", "published")
+    .single();
+
+  if (error) {
+    console.error("Failed to load article:", error);
+  }
+
+  return article;
+}
+
+/* --------------------------------
+   Dynamic SEO Metadata
+--------------------------------- */
+
+export async function generateMetadata({
+  params,
+}: ArticlePageProps): Promise<Metadata> {
+  const article = await getArticle(params.slug);
+
+  if (!article) {
+    return {
+      title: "Article Not Found",
+      description:
+        "The requested TechHunt article could not be found.",
+      robots: {
+        index: false,
+        follow: false,
+      },
+    };
+  }
+
+  const description =
+    article.excerpt ||
+    `Read the latest ${article.category} technology story on TechHunt.`;
+
+  const articleUrl = `${siteUrl}/article/${article.slug}`;
+
+  const metadata: Metadata = {
+    title: article.title,
+
+    description,
+
+    alternates: {
+      canonical: articleUrl,
+    },
+
+    keywords: [
+      article.category,
+      "technology news",
+      "TechHunt",
+    ],
+
+    authors: [
+      {
+        name: article.author || "TechHunt",
+      },
+    ],
+
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+      },
+    },
+
+    openGraph: {
+      type: "article",
+      url: articleUrl,
+      siteName: "TechHunt",
+      title: article.title,
+      description,
+      locale: "en_IN",
+
+      publishedTime: article.published_at ?? article.created_at,
+
+      authors: [article.author || "TechHunt"],
+
+      section: article.category,
+
+      ...(article.image_url
+        ? {
+            images: [
+              {
+                url: article.image_url,
+                width: 1200,
+                height: 630,
+                alt: article.title,
+              },
+            ],
+          }
+        : {}),
+    },
+
+    twitter: {
+      card: article.image_url
+        ? "summary_large_image"
+        : "summary",
+
+      title: article.title,
+
+      description,
+
+      ...(article.image_url
+        ? {
+            images: [article.image_url],
+          }
+        : {}),
+    },
+  };
+
+  return metadata;
+}
+
+/* --------------------------------
+   Article Content Helpers
+--------------------------------- */
 
 function isHeading(text: string) {
   const clean = text.trim();
@@ -21,17 +148,16 @@ function isHeading(text: string) {
   );
 }
 
+/* --------------------------------
+   Article Page
+--------------------------------- */
+
 export default async function ArticlePage({
   params,
 }: ArticlePageProps) {
-  const { data: article, error } = await supabase
-    .from("articles")
-    .select("*")
-    .eq("slug", params.slug)
-    .eq("status", "published")
-    .single();
+  const article = await getArticle(params.slug);
 
-  if (error || !article) {
+  if (!article) {
     return (
       <main className="min-h-screen bg-[#07090d] px-5 py-20 text-white">
         <div className="mx-auto max-w-3xl text-center">
@@ -44,8 +170,8 @@ export default async function ArticlePage({
           </h1>
 
           <p className="mt-4 text-zinc-400">
-            This article may have been removed, unpublished, or does not
-            exist.
+            This article may have been removed, unpublished, or does
+            not exist.
           </p>
 
           <Link
@@ -167,29 +293,31 @@ export default async function ArticlePage({
         {/* Article Content */}
         <div className="mx-auto mt-14 max-w-3xl">
           <div className="space-y-8">
-            {paragraphs.map((paragraph: string, index: number) => {
-              const heading = isHeading(paragraph);
+            {paragraphs.map(
+              (paragraph: string, index: number) => {
+                const heading = isHeading(paragraph);
 
-              if (heading) {
+                if (heading) {
+                  return (
+                    <h2
+                      key={index}
+                      className="pt-5 text-2xl font-black leading-tight tracking-tight text-white sm:text-3xl"
+                    >
+                      {paragraph}
+                    </h2>
+                  );
+                }
+
                 return (
-                  <h2
+                  <p
                     key={index}
-                    className="pt-5 text-2xl font-black leading-tight tracking-tight text-white sm:text-3xl"
+                    className="text-[17px] leading-8 text-zinc-300 sm:text-[18px] sm:leading-9"
                   >
                     {paragraph}
-                  </h2>
+                  </p>
                 );
               }
-
-              return (
-                <p
-                  key={index}
-                  className="text-[17px] leading-8 text-zinc-300 sm:text-[18px] sm:leading-9"
-                >
-                  {paragraph}
-                </p>
-              );
-            })}
+            )}
           </div>
 
           {/* Bottom Navigation */}

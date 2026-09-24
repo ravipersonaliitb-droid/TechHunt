@@ -1,19 +1,95 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { supabase } from "../../../lib/supabase/server";
 
-export default async function CategoryPage({
+const siteUrl = "https://tech-hunt-iota.vercel.app";
+
+type CategoryPageProps = {
+  params: Promise<{
+    category: string;
+  }>;
+};
+
+function getCategoryName(category: string) {
+  return category
+    .split("-")
+    .map(
+      (word) =>
+        word.charAt(0).toUpperCase() + word.slice(1)
+    )
+    .join(" ");
+}
+
+/* --------------------------------
+   Dynamic Category SEO
+--------------------------------- */
+
+export async function generateMetadata({
   params,
-}: {
-  params: Promise<{ category: string }>;
-}) {
+}: CategoryPageProps): Promise<Metadata> {
   const { category } = await params;
 
-  const categoryName =
-    category
-      .split("-")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
+  const categoryName = getCategoryName(category);
+
+  const title = `${categoryName} Technology News`;
+
+  const description = `Latest ${categoryName} technology news, developments, stories and updates from TechHunt.`;
+
+  const categoryUrl = `${siteUrl}/category/${category}`;
+
+  return {
+    title,
+
+    description,
+
+    alternates: {
+      canonical: categoryUrl,
+    },
+
+    keywords: [
+      `${categoryName} news`,
+      `${categoryName} technology`,
+      "technology news",
+      "TechHunt",
+    ],
+
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+      },
+    },
+
+    openGraph: {
+      type: "website",
+      url: categoryUrl,
+      siteName: "TechHunt",
+      title: `${title} | TechHunt`,
+      description,
+      locale: "en_IN",
+    },
+
+    twitter: {
+      card: "summary",
+      title: `${title} | TechHunt`,
+      description,
+    },
+  };
+}
+
+/* --------------------------------
+   Category Page
+--------------------------------- */
+
+export default async function CategoryPage({
+  params,
+}: CategoryPageProps) {
+  const { category } = await params;
+
+  const categoryName = getCategoryName(category);
 
   const { data: articles, error } = await supabase
     .from("articles")
@@ -34,6 +110,7 @@ export default async function CategoryPage({
     )
     .map((article) => ({
       ...article,
+
       date: new Date(
         article.published_at ?? article.created_at
       ).toLocaleDateString("en-IN", {
@@ -41,6 +118,7 @@ export default async function CategoryPage({
         month: "short",
         year: "numeric",
       }),
+
       readTime: `${Math.max(
         1,
         Math.ceil(
@@ -96,9 +174,17 @@ export default async function CategoryPage({
                 key={article.slug}
                 className="news-card"
               >
-                <div className="news-image">
-                  <span>{article.category}</span>
-                </div>
+                {article.image_url ? (
+                  <img
+                    src={article.image_url}
+                    alt={article.title}
+                    className="h-52 w-full object-cover"
+                  />
+                ) : (
+                  <div className="news-image">
+                    <span>{article.category}</span>
+                  </div>
+                )}
 
                 <div className="p-5">
                   <div className="mb-3 flex items-center justify-between text-xs text-zinc-500">
