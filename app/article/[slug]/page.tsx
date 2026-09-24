@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowLeft, Share2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import ShareButton from "./ShareButton";
 import { supabase } from "../../../lib/supabase/server";
 
 type ArticlePageProps = {
@@ -7,6 +8,18 @@ type ArticlePageProps = {
     slug: string;
   };
 };
+
+function isHeading(text: string) {
+  const clean = text.trim();
+
+  if (!clean) return false;
+
+  return (
+    clean.length <= 80 &&
+    !/[.!?,;:]$/.test(clean) &&
+    !clean.includes("→")
+  );
+}
 
 export default async function ArticlePage({
   params,
@@ -31,12 +44,13 @@ export default async function ArticlePage({
           </h1>
 
           <p className="mt-4 text-zinc-400">
-            This article may have been removed, unpublished, or does not exist.
+            This article may have been removed, unpublished, or does not
+            exist.
           </p>
 
           <Link
             href="/"
-            className="mt-8 inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-bold text-black hover:bg-cyan-300"
+            className="mt-8 inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-bold text-black transition hover:bg-cyan-300"
           >
             <ArrowLeft size={17} />
             Back to TechHunt
@@ -74,7 +88,7 @@ export default async function ArticlePage({
 
           <Link
             href="/"
-            className="flex items-center gap-2 text-sm font-semibold text-zinc-400 hover:text-white"
+            className="flex items-center gap-2 text-sm font-semibold text-zinc-400 transition hover:text-white"
           >
             <ArrowLeft size={17} />
             Home
@@ -85,55 +99,58 @@ export default async function ArticlePage({
       {/* Article */}
       <article className="mx-auto max-w-5xl px-5 py-12 lg:py-16">
         {/* Category */}
-        <div className="mb-5">
-          <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.15em] text-cyan-300">
+        <div className="mb-6">
+          <span className="inline-flex rounded-full border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.15em] text-cyan-300">
             {article.category}
           </span>
         </div>
 
         {/* Title */}
-        <h1 className="max-w-4xl text-4xl font-black leading-tight tracking-tight sm:text-5xl lg:text-6xl">
+        <h1 className="max-w-4xl text-4xl font-black leading-[1.08] tracking-tight sm:text-5xl lg:text-6xl">
           {article.title}
         </h1>
 
         {/* Excerpt */}
         {article.excerpt && (
-          <p className="mt-6 max-w-3xl text-lg leading-8 text-zinc-400">
+          <p className="mt-7 max-w-4xl text-lg leading-8 text-zinc-400 sm:text-xl">
             {article.excerpt}
           </p>
         )}
 
         {/* Meta */}
-        <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-white/10 pb-7 text-sm text-zinc-500">
-          <span>By {article.author}</span>
+        <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-white/10 pb-8 text-sm text-zinc-500">
+          <span>
+            By{" "}
+            <span className="font-semibold text-zinc-300">
+              {article.author}
+            </span>
+          </span>
+
           <span>•</span>
+
           <span>{publishedDate}</span>
 
-          <button
-            type="button"
-            className="ml-auto flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-zinc-300 hover:bg-white/5"
-          >
-            <Share2 size={16} />
-            Share
-          </button>
+          <ShareButton
+            title={article.title}
+            excerpt={article.excerpt}
+          />
         </div>
 
         {/* Article Image */}
         {article.image_url ? (
-          <div className="mt-10 overflow-hidden rounded-3xl border border-white/10 bg-black">
+          <div className="mt-10 overflow-hidden rounded-3xl border border-white/10 bg-black shadow-2xl">
             <img
               src={article.image_url}
               alt={article.title}
-              className="h-auto max-h-[650px] w-full object-cover"
+              className="h-auto max-h-[680px] w-full object-cover"
             />
           </div>
         ) : (
-          /* Fallback Hero Visual */
           <div className="article-hero mt-10">
             <div className="article-hero-grid" />
             <div className="article-orb" />
 
-            <div className="relative z-10 flex h-full min-h-[320px] items-end p-7 sm:p-10">
+            <div className="relative z-10 flex min-h-[360px] items-end p-7 sm:p-10">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.25em] text-cyan-400">
                   TechHunt
@@ -147,19 +164,39 @@ export default async function ArticlePage({
           </div>
         )}
 
-        {/* Content */}
-        <div className="mx-auto mt-12 max-w-3xl">
-          <div className="space-y-7 text-[17px] leading-8 text-zinc-300">
-            {paragraphs.map((paragraph: string, index: number) => (
-              <p key={index}>{paragraph}</p>
-            ))}
+        {/* Article Content */}
+        <div className="mx-auto mt-14 max-w-3xl">
+          <div className="space-y-8">
+            {paragraphs.map((paragraph: string, index: number) => {
+              const heading = isHeading(paragraph);
+
+              if (heading) {
+                return (
+                  <h2
+                    key={index}
+                    className="pt-5 text-2xl font-black leading-tight tracking-tight text-white sm:text-3xl"
+                  >
+                    {paragraph}
+                  </h2>
+                );
+              }
+
+              return (
+                <p
+                  key={index}
+                  className="text-[17px] leading-8 text-zinc-300 sm:text-[18px] sm:leading-9"
+                >
+                  {paragraph}
+                </p>
+              );
+            })}
           </div>
 
-          {/* Bottom navigation */}
-          <div className="mt-14 border-t border-white/10 pt-8">
+          {/* Bottom Navigation */}
+          <div className="mt-16 border-t border-white/10 pt-8">
             <Link
               href="/"
-              className="inline-flex items-center gap-2 text-sm font-bold text-cyan-400 hover:text-cyan-300"
+              className="inline-flex items-center gap-2 text-sm font-bold text-cyan-400 transition hover:text-cyan-300"
             >
               <ArrowLeft size={16} />
               Back to latest stories
