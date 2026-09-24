@@ -1,4 +1,5 @@
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 import Link from "next/link";
 import {
@@ -39,7 +40,6 @@ export default async function Home() {
     .from("articles")
     .select("*")
     .eq("status", "published")
-    .order("published_at", { ascending: false })
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -48,6 +48,7 @@ export default async function Home() {
 
   const stories = (dbArticles ?? []).map((article) => ({
     ...article,
+
     date: new Date(
       article.published_at ?? article.created_at
     ).toLocaleDateString("en-IN", {
@@ -55,9 +56,12 @@ export default async function Home() {
       month: "short",
       year: "numeric",
     }),
+
     readTime: `${Math.max(
       1,
-      Math.ceil((article.content?.split(/\s+/).length ?? 200) / 200)
+      Math.ceil(
+        (article.content?.split(/\s+/).length ?? 200) / 200
+      )
     )} min read`,
   }));
 
@@ -78,9 +82,7 @@ export default async function Home() {
             </a>
 
             <a href="#latest">Latest</a>
-
             <a href="#trending">Trending</a>
-
             <a href="#categories">Categories</a>
           </nav>
 
@@ -122,12 +124,14 @@ export default async function Home() {
 
             <h1 className="max-w-4xl text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl">
               Technology. Innovation.{" "}
-              <span className="text-cyan-400">What&apos;s Next.</span>
+              <span className="text-cyan-400">
+                What&apos;s Next.
+              </span>
             </h1>
 
             <p className="mt-4 max-w-2xl text-base leading-7 text-zinc-400">
-              TechHunt covers AI, Indian and global technology, startups,
-              gadgets, cybersecurity and research.
+              TechHunt covers AI, Indian and global technology,
+              startups, gadgets, cybersecurity and research.
             </p>
           </div>
         </div>
@@ -135,11 +139,21 @@ export default async function Home() {
         {featuredArticle ? (
           <div className="grid gap-5 lg:grid-cols-[1.7fr_1fr]">
             {/* Featured Story */}
-            <article className="hero-card">
-              <div className="hero-glow" />
+            <article className="hero-card relative overflow-hidden">
+              {featuredArticle.image_url ? (
+                <img
+                  src={featuredArticle.image_url}
+                  alt={featuredArticle.title}
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+              ) : (
+                <div className="hero-glow absolute inset-0" />
+              )}
 
-              <div className="relative flex h-full min-h-[390px] flex-col justify-end p-7 sm:p-10">
-                <span className="tag">
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/10" />
+
+              <div className="relative z-10 flex h-full min-h-[390px] flex-col justify-end p-7 sm:p-10">
+                <span className="tag w-fit">
                   Featured • {featuredArticle.category}
                 </span>
 
@@ -147,7 +161,7 @@ export default async function Home() {
                   {featuredArticle.title}
                 </h2>
 
-                <p className="mt-4 max-w-2xl text-zinc-300">
+                <p className="mt-4 max-w-2xl text-zinc-200">
                   {featuredArticle.excerpt ||
                     "Read the latest technology story from TechHunt."}
                 </p>
@@ -168,7 +182,9 @@ export default async function Home() {
               className="min-w-0 overflow-hidden rounded-3xl border border-white/10 bg-[#0d1118] p-6"
             >
               <div className="mb-5 flex items-center justify-between">
-                <h3 className="text-lg font-bold">Trending</h3>
+                <h3 className="text-lg font-bold">
+                  Trending
+                </h3>
 
                 <TrendingUp
                   className="text-cyan-400"
@@ -177,27 +193,33 @@ export default async function Home() {
               </div>
 
               <div className="space-y-5">
-                {stories.slice(0, 4).map((story, index) => (
-                  <Link
-                    key={story.slug}
-                    href={`/article/${story.slug}`}
-                    className="group flex min-w-0 gap-4"
-                  >
-                    <span className="shrink-0 text-2xl font-black text-zinc-700">
-                      0{index + 1}
-                    </span>
+                {stories.length > 0 ? (
+                  stories.slice(0, 4).map((story, index) => (
+                    <Link
+                      key={story.id ?? story.slug}
+                      href={`/article/${story.slug}`}
+                      className="group flex min-w-0 gap-4"
+                    >
+                      <span className="shrink-0 text-2xl font-black text-zinc-700">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
 
-                    <div className="min-w-0 flex-1">
-                      <p className="break-words text-sm font-semibold leading-6 text-zinc-200 group-hover:text-cyan-300">
-                        {story.title}
-                      </p>
+                      <div className="min-w-0 flex-1">
+                        <p className="break-words text-sm font-semibold leading-6 text-zinc-200 group-hover:text-cyan-300">
+                          {story.title}
+                        </p>
 
-                      <p className="mt-1 text-xs text-zinc-500">
-                        {story.category}
-                      </p>
-                    </div>
-                  </Link>
-                ))}
+                        <p className="mt-1 text-xs text-zinc-500">
+                          {story.category}
+                        </p>
+                      </div>
+                    </Link>
+                  ))
+                ) : (
+                  <p className="text-sm text-zinc-500">
+                    No trending stories available.
+                  </p>
+                )}
               </div>
             </aside>
           </div>
@@ -269,17 +291,24 @@ export default async function Home() {
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
             {stories.map((story) => (
               <article
-                key={story.slug}
-                className="news-card"
+                key={story.id ?? story.slug}
+                className="news-card overflow-hidden"
               >
-                <div className="news-image">
-                  <span>{story.category}</span>
-                </div>
+                {story.image_url ? (
+                  <img
+                    src={story.image_url}
+                    alt={story.title}
+                    className="h-52 w-full object-cover"
+                  />
+                ) : (
+                  <div className="news-image">
+                    <span>{story.category}</span>
+                  </div>
+                )}
 
                 <div className="p-5">
                   <div className="mb-3 flex items-center justify-between text-xs text-zinc-500">
                     <span>{story.date}</span>
-
                     <span>{story.readTime}</span>
                   </div>
 
@@ -325,8 +354,8 @@ export default async function Home() {
             </h2>
 
             <p className="mt-2 text-sm text-zinc-400">
-              Newsletter signup will be connected after the publishing
-              system is added.
+              Newsletter signup will be connected after the
+              publishing system is added.
             </p>
           </div>
 
