@@ -25,12 +25,7 @@ export const metadata: Metadata = {
     "TechHunt",
   ],
 
-  authors: [
-    {
-      name: "TechHunt",
-    },
-  ],
-
+  authors: [{ name: "TechHunt" }],
   creator: "TechHunt",
   publisher: "TechHunt",
 
@@ -41,6 +36,10 @@ export const metadata: Metadata = {
       index: true,
       follow: true,
     },
+  },
+
+  verification: {
+    google: "R8LugMCYuErX8OaVGV3TbBIDhycXDcpWMdlscAGqnWA",
   },
 
   openGraph: {
