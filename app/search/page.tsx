@@ -5,15 +5,15 @@ import { supabase } from "../../lib/supabase/server";
 export default async function SearchPage({
   searchParams,
 }: {
-  searchParams: { q?: string };
+  searchParams: Promise<{ q?: string }>;
 }) {
-  const query = searchParams.q?.trim() || "";
+  const params = await searchParams;
+  const query = params.q?.trim() || "";
 
   const { data: articles, error } = await supabase
     .from("articles")
     .select("*")
     .eq("status", "published")
-    .order("published_at", { ascending: false })
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -22,6 +22,7 @@ export default async function SearchPage({
 
   const publishedArticles = (articles ?? []).map((article) => ({
     ...article,
+
     date: new Date(
       article.published_at ?? article.created_at
     ).toLocaleDateString("en-IN", {
@@ -29,6 +30,7 @@ export default async function SearchPage({
       month: "short",
       year: "numeric",
     }),
+
     readTime: `${Math.max(
       1,
       Math.ceil(
@@ -64,7 +66,7 @@ export default async function SearchPage({
 
           <Link
             href="/"
-            className="flex items-center gap-2 text-sm font-semibold text-zinc-400 hover:text-white"
+            className="flex items-center gap-2 text-sm font-semibold text-zinc-400 transition hover:text-white"
           >
             <ArrowLeft size={16} />
             Back to Home
@@ -81,6 +83,11 @@ export default async function SearchPage({
         <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">
           Search Technology News
         </h1>
+
+        <p className="mt-4 max-w-2xl text-base leading-7 text-zinc-400">
+          Search TechHunt stories across AI, gadgets, startups,
+          cybersecurity, software, research and more.
+        </p>
 
         {/* Search Form */}
         <form
@@ -121,6 +128,11 @@ export default async function SearchPage({
               <span className="font-semibold text-white">
                 &quot;{query}&quot;
               </span>
+
+              <span className="ml-2 text-zinc-600">
+                ({results.length}{" "}
+                {results.length === 1 ? "story" : "stories"})
+              </span>
             </p>
           ) : (
             <p className="text-sm text-zinc-400">
@@ -133,18 +145,33 @@ export default async function SearchPage({
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
             {results.map((article) => (
               <article
-                key={article.slug}
-                className="news-card"
+                key={article.id ?? article.slug}
+                className="news-card overflow-hidden"
               >
-                <div className="news-image">
-                  <span>{article.category}</span>
-                </div>
+                {/* Article Image */}
+                {article.image_url ? (
+                  <img
+                    src={article.image_url}
+                    alt={article.title}
+                    className="h-52 w-full object-cover"
+                  />
+                ) : (
+                  <div className="news-image">
+                    <span>{article.category}</span>
+                  </div>
+                )}
 
                 <div className="p-5">
                   <div className="mb-3 flex items-center justify-between text-xs text-zinc-500">
                     <span>{article.date}</span>
 
                     <span>{article.readTime}</span>
+                  </div>
+
+                  <div className="mb-3">
+                    <span className="rounded-full bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-300">
+                      {article.category}
+                    </span>
                   </div>
 
                   <h2 className="text-xl font-bold leading-7">
@@ -158,7 +185,7 @@ export default async function SearchPage({
 
                   <Link
                     href={`/article/${article.slug}`}
-                    className="mt-5 flex items-center gap-1 text-sm font-bold text-cyan-400"
+                    className="mt-5 flex items-center gap-1 text-sm font-bold text-cyan-400 transition hover:text-cyan-300"
                   >
                     Read story
                     <ArrowRight size={15} />
@@ -169,7 +196,11 @@ export default async function SearchPage({
           </div>
         ) : (
           <div className="rounded-3xl border border-white/10 bg-[#0d1118] p-10 text-center">
-            <h2 className="text-2xl font-bold">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white/5">
+              <Search size={24} className="text-zinc-500" />
+            </div>
+
+            <h2 className="mt-5 text-2xl font-bold">
               No stories found
             </h2>
 
@@ -179,7 +210,7 @@ export default async function SearchPage({
 
             <Link
               href="/search"
-              className="mt-6 inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-bold text-black hover:bg-cyan-300"
+              className="mt-6 inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-bold text-black transition hover:bg-cyan-300"
             >
               View all stories
               <ArrowRight size={16} />
