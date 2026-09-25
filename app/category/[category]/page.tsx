@@ -1,24 +1,64 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ArrowLeft, ArrowRight } from "lucide-react";
+import { notFound } from "next/navigation";
 import { supabase } from "../../../lib/supabase/server";
 
 const siteUrl = "https://tech-hunt-iota.vercel.app";
 
 type CategoryPageProps = {
-  params: Promise<{
+  params: {
     category: string;
-  }>;
+  };
 };
 
-function getCategoryName(category: string) {
-  return category
-    .split("-")
-    .map(
-      (word) =>
-        word.charAt(0).toUpperCase() + word.slice(1)
-    )
-    .join(" ");
+/* --------------------------------
+   Supported Categories
+--------------------------------- */
+
+const categories = [
+  {
+    name: "AI",
+    slug: "ai",
+  },
+  {
+    name: "India Tech",
+    slug: "india-tech",
+  },
+  {
+    name: "Gadgets",
+    slug: "gadgets",
+  },
+  {
+    name: "Startups",
+    slug: "startups",
+  },
+  {
+    name: "Cybersecurity",
+    slug: "cybersecurity",
+  },
+  {
+    name: "Software",
+    slug: "software",
+  },
+  {
+    name: "Research",
+    slug: "research",
+  },
+];
+
+/* --------------------------------
+   Category Helpers
+--------------------------------- */
+
+function getCategory(categorySlug: string) {
+  return categories.find(
+    (category) =>
+      category.slug.toLowerCase() === categorySlug.toLowerCase()
+  );
 }
 
 /* --------------------------------
@@ -28,15 +68,25 @@ function getCategoryName(category: string) {
 export async function generateMetadata({
   params,
 }: CategoryPageProps): Promise<Metadata> {
-  const { category } = await params;
+  const category = getCategory(params.category);
 
-  const categoryName = getCategoryName(category);
+  if (!category) {
+    return {
+      title: "Category Not Found | TechHunt",
+      description:
+        "The requested TechHunt category could not be found.",
+      robots: {
+        index: false,
+        follow: false,
+      },
+    };
+  }
 
-  const title = `${categoryName} Technology News`;
+  const title = `${category.name} Technology News`;
 
-  const description = `Latest ${categoryName} technology news, developments, stories and updates from TechHunt.`;
+  const description = `Latest ${category.name} technology news, developments, stories and updates from TechHunt.`;
 
-  const categoryUrl = `${siteUrl}/category/${category}`;
+  const categoryUrl = `${siteUrl}/category/${category.slug}`;
 
   return {
     title,
@@ -48,8 +98,8 @@ export async function generateMetadata({
     },
 
     keywords: [
-      `${categoryName} news`,
-      `${categoryName} technology`,
+      `${category.name} news`,
+      `${category.name} technology`,
       "technology news",
       "TechHunt",
     ],
@@ -87,14 +137,25 @@ export async function generateMetadata({
 export default async function CategoryPage({
   params,
 }: CategoryPageProps) {
-  const { category } = await params;
+  const category = getCategory(params.category);
 
-  const categoryName = getCategoryName(category);
+  /* --------------------------------
+     Invalid Category
+  --------------------------------- */
+
+  if (!category) {
+    notFound();
+  }
+
+  /* --------------------------------
+     Fetch Only This Category
+  --------------------------------- */
 
   const { data: articles, error } = await supabase
     .from("articles")
     .select("*")
     .eq("status", "published")
+    .eq("category", category.name)
     .order("published_at", { ascending: false })
     .order("created_at", { ascending: false });
 
@@ -102,35 +163,33 @@ export default async function CategoryPage({
     console.error("Failed to load category articles:", error);
   }
 
-  const categoryArticles = (articles ?? [])
-    .filter(
-      (article) =>
-        article.category.toLowerCase().replace(/\s+/g, "-") ===
-        category.toLowerCase()
-    )
-    .map((article) => ({
-      ...article,
+  /* --------------------------------
+     Format Articles
+  --------------------------------- */
 
-      date: new Date(
-        article.published_at ?? article.created_at
-      ).toLocaleDateString("en-IN", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      }),
+  const categoryArticles = (articles ?? []).map((article) => ({
+    ...article,
 
-      readTime: `${Math.max(
-        1,
-        Math.ceil(
-          (article.content?.split(/\s+/).length ?? 200) / 200
-        )
-      )} min read`,
-    }));
+    date: new Date(
+      article.published_at ?? article.created_at
+    ).toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }),
+
+    readTime: `${Math.max(
+      1,
+      Math.ceil(
+        (article.content?.split(/\s+/).length ?? 200) / 200
+      )
+    )} min read`,
+  }));
 
   return (
     <main className="min-h-screen bg-[#07090d] text-white">
       {/* Header */}
-      <header className="border-b border-white/10">
+      <header className="border-b border-white/10 bg-[#07090d]/95">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5">
           <Link
             href="/"
@@ -141,7 +200,7 @@ export default async function CategoryPage({
 
           <Link
             href="/"
-            className="flex items-center gap-2 text-sm font-semibold text-zinc-400 hover:text-white"
+            className="flex items-center gap-2 text-sm font-semibold text-zinc-400 transition hover:text-white"
           >
             <ArrowLeft size={16} />
             Back to Home
@@ -156,12 +215,12 @@ export default async function CategoryPage({
         </p>
 
         <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">
-          {categoryName}
+          {category.name}
         </h1>
 
         <p className="mt-4 max-w-2xl text-base leading-7 text-zinc-400">
-          Latest stories and developments from the {categoryName} section
-          of TechHunt.
+          Latest stories and developments from the {category.name}{" "}
+          section of TechHunt.
         </p>
       </section>
 
@@ -171,9 +230,10 @@ export default async function CategoryPage({
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
             {categoryArticles.map((article) => (
               <article
-                key={article.slug}
-                className="news-card"
+                key={article.id ?? article.slug}
+                className="news-card overflow-hidden"
               >
+                {/* Article Image */}
                 {article.image_url ? (
                   <img
                     src={article.image_url}
@@ -186,6 +246,7 @@ export default async function CategoryPage({
                   </div>
                 )}
 
+                {/* Article Details */}
                 <div className="p-5">
                   <div className="mb-3 flex items-center justify-between text-xs text-zinc-500">
                     <span>{article.date}</span>
@@ -204,7 +265,7 @@ export default async function CategoryPage({
 
                   <Link
                     href={`/article/${article.slug}`}
-                    className="mt-5 flex items-center gap-1 text-sm font-bold text-cyan-400"
+                    className="mt-5 flex items-center gap-1 text-sm font-bold text-cyan-400 transition hover:text-cyan-300"
                   >
                     Read story
                     <ArrowRight size={15} />
@@ -220,12 +281,13 @@ export default async function CategoryPage({
             </h2>
 
             <p className="mt-3 text-zinc-400">
-              There are currently no published articles in this category.
+              There are currently no published articles in the{" "}
+              {category.name} category.
             </p>
 
             <Link
               href="/"
-              className="mt-6 inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-bold text-black hover:bg-cyan-300"
+              className="mt-6 inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-bold text-black transition hover:bg-cyan-300"
             >
               Back to TechHunt
               <ArrowLeft size={16} />
