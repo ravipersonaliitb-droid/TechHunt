@@ -92,7 +92,13 @@ export async function generateMetadata({
       description,
       locale: "en_IN",
 
-      publishedTime: article.published_at ?? article.created_at,
+      publishedTime:
+        article.published_at ?? article.created_at,
+
+      modifiedTime:
+        article.updated_at ??
+        article.published_at ??
+        article.created_at,
 
       authors: [article.author || "TechHunt"],
 
@@ -149,6 +155,84 @@ function isHeading(text: string) {
 }
 
 /* --------------------------------
+   Article Structured Data
+--------------------------------- */
+
+function createArticleStructuredData(article: any) {
+  const articleUrl = `${siteUrl}/article/${article.slug}`;
+
+  const publishedDate =
+    article.published_at ?? article.created_at;
+
+  const modifiedDate =
+    article.updated_at ??
+    article.published_at ??
+    article.created_at;
+
+  const authorName = article.author || "TechHunt";
+
+  const author =
+    authorName === "TechHunt"
+      ? {
+          "@type": "Organization",
+          name: "TechHunt",
+          url: siteUrl,
+        }
+      : {
+          "@type": "Person",
+          name: authorName,
+        };
+
+  const structuredData: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "NewsArticle",
+
+    headline: article.title,
+
+    description:
+      article.excerpt ||
+      `Read the latest ${article.category} technology story on TechHunt.`,
+
+    url: articleUrl,
+
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": articleUrl,
+    },
+
+    datePublished: publishedDate,
+
+    dateModified: modifiedDate,
+
+    author,
+
+    publisher: {
+      "@type": "Organization",
+      name: "TechHunt",
+      url: siteUrl,
+    },
+
+    articleSection: article.category,
+
+    keywords: [
+      article.category,
+      "technology news",
+      "TechHunt",
+    ],
+
+    inLanguage: "en-IN",
+
+    isAccessibleForFree: true,
+  };
+
+  if (article.image_url) {
+    structuredData.image = [article.image_url];
+  }
+
+  return structuredData;
+}
+
+/* --------------------------------
    Article Page
 --------------------------------- */
 
@@ -186,6 +270,8 @@ export default async function ArticlePage({
     );
   }
 
+  const structuredData = createArticleStructuredData(article);
+
   const publishedDate = new Date(
     article.published_at ?? article.created_at
   ).toLocaleDateString("en-IN", {
@@ -201,6 +287,17 @@ export default async function ArticlePage({
 
   return (
     <main className="min-h-screen bg-[#07090d] text-white">
+      {/* Article Structured Data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(structuredData).replace(
+            /</g,
+            "\\u003c"
+          ),
+        }}
+      />
+
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-white/10 bg-[#07090d]/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
