@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ArrowLeft, ArrowRight, Search } from "lucide-react";
@@ -20,25 +23,62 @@ export const metadata: Metadata = {
   },
 };
 
+type SearchPageProps = {
+  searchParams: Promise<{
+    q?: string;
+  }>;
+};
+
 export default async function SearchPage({
   searchParams,
-}: {
-  searchParams: Promise<{ q?: string }>;
-}) {
+}: SearchPageProps) {
   const params = await searchParams;
+
   const query = params.q?.trim() || "";
 
-  const { data: articles, error } = await supabase
+  /* --------------------------------
+     Fetch Published Articles
+  --------------------------------- */
+
+  let articlesQuery = supabase
     .from("articles")
     .select("*")
     .eq("status", "published")
-    .order("created_at", { ascending: false });
+    .order("published_at", {
+      ascending: false,
+      nullsFirst: false,
+    })
+    .order("created_at", {
+      ascending: false,
+    });
+
+  /* --------------------------------
+     Search
+  --------------------------------- */
+
+  if (query) {
+    const escapedQuery = query
+      .replace(/\\/g, "\\\\")
+      .replace(/%/g, "\\%")
+      .replace(/_/g, "\\_")
+      .replace(/,/g, " ");
+
+    articlesQuery = articlesQuery.or(
+      `title.ilike.%${escapedQuery}%,excerpt.ilike.%${escapedQuery}%,category.ilike.%${escapedQuery}%,content.ilike.%${escapedQuery}%`
+    );
+  }
+
+  const { data: articles, error } = await articlesQuery;
 
   if (error) {
     console.error("Failed to load search articles:", error);
   }
 
-  const publishedArticles = (articles ?? []).map((article) => ({
+  /* --------------------------------
+     Format Articles
+  --------------------------------- */
+
+  const results = (articles ?? []).map((article) => ({
     ...article,
 
     date: new Date(
@@ -57,23 +97,10 @@ export default async function SearchPage({
     )} min read`,
   }));
 
-  const results = query
-    ? publishedArticles.filter((article) => {
-        const searchableText = `
-          ${article.title}
-          ${article.excerpt ?? ""}
-          ${article.category}
-          ${article.content ?? ""}
-        `.toLowerCase();
-
-        return searchableText.includes(query.toLowerCase());
-      })
-    : publishedArticles;
-
   return (
     <main className="min-h-screen bg-[#07090d] text-white">
       {/* Header */}
-      <header className="border-b border-white/10">
+      <header className="border-b border-white/10 bg-[#07090d]/95">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5">
           <Link
             href="/"
