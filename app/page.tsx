@@ -65,7 +65,28 @@ export default async function Home() {
     )} min read`,
   }));
 
-  const featuredArticle = stories[0];
+  /*
+   * FEATURED ARTICLE
+   *
+   * First look for an article where featured = true.
+   * If no article is marked as featured, use the newest article.
+   *
+   * Because stories are already ordered newest-first,
+   * if multiple articles are marked featured, the newest
+   * featured article will be selected.
+   */
+  const featuredArticle =
+    stories.find((story) => story.featured === true) ??
+    stories[0];
+
+  /*
+   * TRENDING ARTICLES
+   *
+   * Do not show the featured article again in Trending.
+   */
+  const trendingStories = stories
+    .filter((story) => story.slug !== featuredArticle?.slug)
+    .slice(0, 4);
 
   return (
     <main className="min-h-screen bg-[#07090d] text-white">
@@ -193,8 +214,8 @@ export default async function Home() {
               </div>
 
               <div className="space-y-5">
-                {stories.length > 0 ? (
-                  stories.slice(0, 4).map((story, index) => (
+                {trendingStories.length > 0 ? (
+                  trendingStories.map((story, index) => (
                     <Link
                       key={story.id ?? story.slug}
                       href={`/article/${story.slug}`}
