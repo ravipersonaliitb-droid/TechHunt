@@ -43,12 +43,18 @@ export default function EditArticlePage() {
   const [author, setAuthor] = useState("TechHunt");
   const [excerpt, setExcerpt] = useState("");
   const [content, setContent] = useState("");
-  const [status, setStatus] = useState<"draft" | "published">("draft");
+  const [status, setStatus] =
+    useState<"draft" | "published">("draft");
   const [featured, setFeatured] = useState(false);
+
   const [imageUrl, setImageUrl] = useState("");
+  const [image, setImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -102,6 +108,7 @@ export default function EditArticlePage() {
       setStatus(loadedArticle.status ?? "draft");
       setFeatured(loadedArticle.featured ?? false);
       setImageUrl(loadedArticle.image_url ?? "");
+      setImagePreview(loadedArticle.image_url ?? "");
 
       setLoading(false);
     }
@@ -109,7 +116,91 @@ export default function EditArticlePage() {
     loadArticle();
   }, [articleId, router]);
 
-  async function handleSave(event: React.FormEvent<HTMLFormElement>) {
+  function handleImageChange(
+    event: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    setMessage("");
+    setErrorMessage("");
+
+    if (!file.type.startsWith("image/")) {
+      setErrorMessage(
+        "Please select a valid image file."
+      );
+      return;
+    }
+
+    if (file.size > 6 * 1024 * 1024) {
+      setErrorMessage(
+        "Image must be smaller than 6 MB."
+      );
+      return;
+    }
+
+    setImage(file);
+
+    const previewUrl = URL.createObjectURL(file);
+    setImagePreview(previewUrl);
+  }
+
+  async function uploadImage() {
+    if (!image) {
+      return imageUrl.trim();
+    }
+
+    setUploading(true);
+
+    try {
+      const supabase = createClient();
+
+      const fileExtension =
+        image.name.split(".").pop()?.toLowerCase() || "jpg";
+
+      const safeFileName = image.name
+        .replace(/\.[^/.]+$/, "")
+        .replace(/[^a-zA-Z0-9-_]/g, "-")
+        .toLowerCase();
+
+      const fileName = `${safeFileName}-${Date.now()}.${fileExtension}`;
+
+      const filePath = `articles/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("article-images")
+        .upload(filePath, image, {
+          cacheControl: "3600",
+          contentType: image.type,
+          upsert: false,
+        });
+
+      if (uploadError) {
+        throw new Error(uploadError.message);
+      }
+
+      const { data } = supabase.storage
+        .from("article-images")
+        .getPublicUrl(filePath);
+
+      if (!data?.publicUrl) {
+        throw new Error(
+          "Image uploaded, but the public URL could not be generated."
+        );
+      }
+
+      return data.publicUrl;
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleSave(
+    event: React.FormEvent<HTMLFormElement>
+  ) {
     event.preventDefault();
 
     setSaving(true);
@@ -134,42 +225,59 @@ export default function EditArticlePage() {
       return;
     }
 
-    const supabase = createClient();
+    try {
+      const supabase = createClient();
 
-    const { error } = await supabase
-      .from("articles")
-      .update({
-        title: title.trim(),
-        slug: slug.trim(),
-        category,
-        author: author.trim() || "TechHunt",
-        excerpt: excerpt.trim() || null,
-        content: content.trim(),
-        status,
-        featured,
-        image_url: imageUrl.trim() || null,
-        published_at:
-          status === "published"
-            ? article?.published_at || new Date().toISOString()
-            : null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", articleId);
+      let finalImageUrl = imageUrl.trim();
 
-    if (error) {
-      setErrorMessage(error.message);
+      if (image) {
+        finalImageUrl = await uploadImage();
+      }
+
+      const { error } = await supabase
+        .from("articles")
+        .update({
+          title: title.trim(),
+          slug: slug.trim(),
+          category,
+          author: author.trim() || "TechHunt",
+          excerpt: excerpt.trim() || null,
+          content: content.trim(),
+          status,
+          featured,
+          image_url: finalImageUrl || null,
+          published_at:
+            status === "published"
+              ? article?.published_at ||
+                new Date().toISOString()
+              : null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", articleId);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setMessage(
+        "Article updated successfully."
+      );
+
+      setImage(null);
+
+      setTimeout(() => {
+        router.push("/admin/articles");
+        router.refresh();
+      }, 800);
+    } catch (err) {
+      setErrorMessage(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong while saving the article."
+      );
+    } finally {
       setSaving(false);
-      return;
     }
-
-    setMessage("Article updated successfully.");
-
-    setSaving(false);
-
-    setTimeout(() => {
-      router.push("/admin/articles");
-      router.refresh();
-    }, 800);
   }
 
   if (loading) {
@@ -368,7 +476,7 @@ export default function EditArticlePage() {
                     onChange={(event) =>
                       setAuthor(event.target.value)
                     }
-                    className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none transition placeholder:text-zinc-700 focus:border-cyan-400/50"
+                    className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none focus:border-cyan-400/50"
                     placeholder="TechHunt"
                   />
                 </div>
@@ -390,35 +498,58 @@ export default function EditArticlePage() {
                     setExcerpt(event.target.value)
                   }
                   rows={4}
-                  className="w-full resize-y rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none transition placeholder:text-zinc-700 focus:border-cyan-400/50"
+                  className="w-full resize-y rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none placeholder:text-zinc-700 focus:border-cyan-400/50"
                   placeholder="Write a short summary of the article..."
                 />
               </div>
 
-              {/* Image URL */}
+              {/* Article Image */}
               <div>
                 <label
-                  htmlFor="imageUrl"
+                  htmlFor="image"
                   className="mb-2 block text-sm font-medium text-zinc-300"
                 >
-                  Image URL
+                  Article Image
                 </label>
 
-                <input
-                  id="imageUrl"
-                  type="url"
-                  value={imageUrl}
-                  onChange={(event) =>
-                    setImageUrl(event.target.value)
-                  }
-                  className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none transition placeholder:text-zinc-700 focus:border-cyan-400/50"
-                  placeholder="https://example.com/image.jpg"
-                />
+                <div className="rounded-2xl border border-dashed border-white/15 bg-black p-5">
+                  <input
+                    id="image"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    onChange={handleImageChange}
+                    className="block w-full text-sm text-zinc-400 file:mr-4 file:rounded-lg file:border-0 file:bg-cyan-400 file:px-4 file:py-2 file:font-semibold file:text-black"
+                  />
 
-                <p className="mt-2 text-xs text-zinc-600">
-                  Image upload will be added later using Supabase
-                  Storage.
-                </p>
+                  <p className="mt-3 text-sm text-zinc-500">
+                    Select JPG, PNG, WebP or GIF. Maximum 6 MB.
+                  </p>
+
+                  {imagePreview && (
+                    <div className="mt-5 overflow-hidden rounded-xl border border-white/10">
+                      <img
+                        src={imagePreview}
+                        alt="Article image preview"
+                        className="max-h-96 w-full object-cover"
+                      />
+                    </div>
+                  )}
+
+                  {imageUrl && !image && (
+                    <p className="mt-3 text-xs text-zinc-600 break-all">
+                      Current image:
+                      <br />
+                      {imageUrl}
+                    </p>
+                  )}
+
+                  {image && (
+                    <p className="mt-3 text-sm text-cyan-300">
+                      New image selected. It will be uploaded when you
+                      click "Save Changes".
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </section>
@@ -440,7 +571,7 @@ export default function EditArticlePage() {
                 setContent(event.target.value)
               }
               rows={20}
-              className="mt-6 w-full resize-y rounded-xl border border-white/10 bg-black px-4 py-4 text-white outline-none transition placeholder:text-zinc-700 focus:border-cyan-400/50"
+              className="mt-6 w-full resize-y rounded-xl border border-white/10 bg-black px-4 py-4 text-white outline-none placeholder:text-zinc-700 focus:border-cyan-400/50"
               placeholder="Write your article..."
             />
           </section>
@@ -512,10 +643,14 @@ export default function EditArticlePage() {
 
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || uploading}
               className="inline-flex items-center justify-center rounded-xl bg-cyan-400 px-7 py-3 font-semibold text-black transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {saving ? "Saving..." : "Save Changes"}
+              {uploading
+                ? "Uploading Image..."
+                : saving
+                  ? "Saving..."
+                  : "Save Changes"}
             </button>
           </div>
         </form>

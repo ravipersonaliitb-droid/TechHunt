@@ -12,6 +12,9 @@ type ArticlePageProps = {
 
 const siteUrl = "https://tech-hunt-iota.vercel.app";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 async function getArticle(slug: string) {
   const { data: article, error } = await supabase
     .from("articles")
