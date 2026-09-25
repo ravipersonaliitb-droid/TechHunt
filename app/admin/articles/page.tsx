@@ -17,14 +17,33 @@ type Article = {
   published_at: string | null;
 };
 
+const categories = [
+  "All",
+  "AI",
+  "India Tech",
+  "Gadgets",
+  "Startups",
+  "Cybersecurity",
+  "Software",
+  "Research",
+];
+
 export default function ManageArticlesPage() {
   const router = useRouter();
 
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+
   const [busyId, setBusyId] = useState<number | null>(null);
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "published" | "draft"
+  >("all");
 
   async function loadArticles() {
     const supabase = createClient();
@@ -97,6 +116,58 @@ export default function ManageArticlesPage() {
     setBusyId(null);
   }
 
+  async function toggleFeatured(article: Article) {
+    setBusyId(article.id);
+    setMessage("");
+    setErrorMessage("");
+
+    const supabase = createClient();
+
+    /*
+      Only one article is kept as featured at a time.
+      If this article is being featured, remove featured
+      status from any other article first.
+    */
+    if (!article.featured) {
+      const { error: clearError } = await supabase
+        .from("articles")
+        .update({
+          featured: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("featured", true);
+
+      if (clearError) {
+        setErrorMessage(clearError.message);
+        setBusyId(null);
+        return;
+      }
+    }
+
+    const { error } = await supabase
+      .from("articles")
+      .update({
+        featured: !article.featured,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", article.id);
+
+    if (error) {
+      setErrorMessage(error.message);
+      setBusyId(null);
+      return;
+    }
+
+    setMessage(
+      article.featured
+        ? "Article removed from Featured."
+        : "Article is now Featured on the homepage."
+    );
+
+    await loadArticles();
+    setBusyId(null);
+  }
+
   async function deleteArticle(article: Article) {
     const confirmed = window.confirm(
       `Delete "${article.title}"? This cannot be undone.`
@@ -141,12 +212,31 @@ export default function ManageArticlesPage() {
     });
   }
 
+  const filteredArticles = articles.filter((article) => {
+    const query = searchQuery.trim().toLowerCase();
+
+    const matchesSearch =
+      !query ||
+      article.title.toLowerCase().includes(query) ||
+      article.slug.toLowerCase().includes(query) ||
+      article.category.toLowerCase().includes(query) ||
+      article.author.toLowerCase().includes(query);
+
+    const matchesCategory =
+      categoryFilter === "All" ||
+      article.category === categoryFilter;
+
+    const matchesStatus =
+      statusFilter === "all" ||
+      article.status === statusFilter;
+
+    return matchesSearch && matchesCategory && matchesStatus;
+  });
+
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-black text-white">
-        <p className="text-zinc-400">
-          Loading articles...
-        </p>
+        <p className="text-zinc-400">Loading articles...</p>
       </main>
     );
   }
@@ -174,6 +264,7 @@ export default function ManageArticlesPage() {
 
       {/* Main */}
       <div className="mx-auto max-w-7xl px-6 py-10">
+        {/* Page heading */}
         <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
           <div>
             <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-cyan-400">
@@ -185,7 +276,8 @@ export default function ManageArticlesPage() {
             </h1>
 
             <p className="mt-3 text-zinc-400">
-              View, publish, edit, and delete your TechHunt stories.
+              View, search, filter, publish, feature, edit, and delete
+              your TechHunt stories.
             </p>
           </div>
 
@@ -210,8 +302,119 @@ export default function ManageArticlesPage() {
           </div>
         )}
 
+        {/* Filters */}
+        <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+          <div className="grid gap-4 lg:grid-cols-[1fr_220px_180px]">
+            {/* Search */}
+            <div>
+              <label className="mb-2 block text-sm font-medium text-zinc-400">
+                Search Articles
+              </label>
+
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(event) =>
+                    setSearchQuery(event.target.value)
+                  }
+                  placeholder="Search by title, slug, category or author..."
+                  className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 pr-10 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-cyan-400/50"
+                />
+
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 transition hover:text-white"
+                    aria-label="Clear search"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Category */}
+            <div>
+              <label className="mb-2 block text-sm font-medium text-zinc-400">
+                Category
+              </label>
+
+              <select
+                value={categoryFilter}
+                onChange={(event) =>
+                  setCategoryFilter(event.target.value)
+                }
+                className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-sm text-white outline-none focus:border-cyan-400/50"
+              >
+                {categories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Status */}
+            <div>
+              <label className="mb-2 block text-sm font-medium text-zinc-400">
+                Status
+              </label>
+
+              <select
+                value={statusFilter}
+                onChange={(event) =>
+                  setStatusFilter(
+                    event.target.value as
+                      | "all"
+                      | "published"
+                      | "draft"
+                  )
+                }
+                className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-sm text-white outline-none focus:border-cyan-400/50"
+              >
+                <option value="all">All Status</option>
+                <option value="published">Published</option>
+                <option value="draft">Draft</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Filter summary */}
+          <div className="mt-4 flex flex-col gap-2 border-t border-white/5 pt-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-zinc-500">
+              Showing{" "}
+              <span className="font-semibold text-zinc-300">
+                {filteredArticles.length}
+              </span>{" "}
+              of{" "}
+              <span className="font-semibold text-zinc-300">
+                {articles.length}
+              </span>{" "}
+              articles
+            </p>
+
+            {(searchQuery ||
+              categoryFilter !== "All" ||
+              statusFilter !== "all") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
+                  setCategoryFilter("All");
+                  setStatusFilter("all");
+                }}
+                className="text-left text-cyan-400 transition hover:text-cyan-300 sm:text-right"
+              >
+                Clear all filters
+              </button>
+            )}
+          </div>
+        </section>
+
         {/* Articles */}
-        <section className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
+        <section className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
           {articles.length === 0 ? (
             <div className="px-6 py-16 text-center">
               <h2 className="text-xl font-semibold">
@@ -228,6 +431,28 @@ export default function ManageArticlesPage() {
               >
                 Create Article
               </Link>
+            </div>
+          ) : filteredArticles.length === 0 ? (
+            <div className="px-6 py-16 text-center">
+              <h2 className="text-xl font-semibold">
+                No matching articles
+              </h2>
+
+              <p className="mt-2 text-zinc-500">
+                Try changing your search or filters.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
+                  setCategoryFilter("All");
+                  setStatusFilter("all");
+                }}
+                className="mt-6 rounded-xl border border-cyan-400/30 px-5 py-3 font-semibold text-cyan-400 transition hover:bg-cyan-400/10"
+              >
+                Clear Filters
+              </button>
             </div>
           ) : (
             <>
@@ -259,16 +484,25 @@ export default function ManageArticlesPage() {
                   </thead>
 
                   <tbody>
-                    {articles.map((article) => (
+                    {filteredArticles.map((article) => (
                       <tr
                         key={article.id}
                         className="border-b border-white/5 last:border-0"
                       >
+                        {/* Article */}
                         <td className="px-6 py-5">
                           <div className="max-w-md">
-                            <p className="font-semibold">
-                              {article.title}
-                            </p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-semibold">
+                                {article.title}
+                              </p>
+
+                              {article.featured && (
+                                <span className="rounded-full bg-cyan-400/10 px-2.5 py-1 text-[11px] font-semibold text-cyan-400">
+                                  ★ Featured
+                                </span>
+                              )}
+                            </div>
 
                             <p className="mt-1 truncate text-sm text-zinc-600">
                               /article/{article.slug}
@@ -276,12 +510,14 @@ export default function ManageArticlesPage() {
                           </div>
                         </td>
 
+                        {/* Category */}
                         <td className="px-6 py-5">
                           <span className="rounded-full bg-white/5 px-3 py-1 text-xs font-medium text-zinc-300">
                             {article.category}
                           </span>
                         </td>
 
+                        {/* Status */}
                         <td className="px-6 py-5">
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-semibold ${
@@ -296,6 +532,7 @@ export default function ManageArticlesPage() {
                           </span>
                         </td>
 
+                        {/* Date */}
                         <td className="whitespace-nowrap px-6 py-5 text-sm text-zinc-500">
                           {formatDate(
                             article.published_at ||
@@ -303,8 +540,19 @@ export default function ManageArticlesPage() {
                           )}
                         </td>
 
+                        {/* Actions */}
                         <td className="px-6 py-5">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex flex-wrap items-center justify-end gap-2">
+                            {article.status === "published" && (
+                              <Link
+                                href={`/article/${article.slug}`}
+                                target="_blank"
+                                className="rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-zinc-300 transition hover:bg-white/5 hover:text-white"
+                              >
+                                View
+                              </Link>
+                            )}
+
                             <Link
                               href={`/admin/articles/${article.id}/edit`}
                               className="rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-zinc-300 transition hover:bg-white/5 hover:text-white"
@@ -313,6 +561,26 @@ export default function ManageArticlesPage() {
                             </Link>
 
                             <button
+                              type="button"
+                              onClick={() =>
+                                toggleFeatured(article)
+                              }
+                              disabled={busyId === article.id}
+                              className={`rounded-lg border px-3 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                                article.featured
+                                  ? "border-cyan-400/30 bg-cyan-400/10 text-cyan-400 hover:bg-cyan-400/20"
+                                  : "border-white/10 text-zinc-400 hover:bg-white/5 hover:text-white"
+                              }`}
+                            >
+                              {busyId === article.id
+                                ? "..."
+                                : article.featured
+                                  ? "Unfeature"
+                                  : "Feature"}
+                            </button>
+
+                            <button
+                              type="button"
                               onClick={() =>
                                 togglePublish(article)
                               }
@@ -322,11 +590,12 @@ export default function ManageArticlesPage() {
                               {busyId === article.id
                                 ? "..."
                                 : article.status === "published"
-                                ? "Unpublish"
-                                : "Publish"}
+                                  ? "Unpublish"
+                                  : "Publish"}
                             </button>
 
                             <button
+                              type="button"
                               onClick={() =>
                                 deleteArticle(article)
                               }
@@ -345,16 +614,24 @@ export default function ManageArticlesPage() {
 
               {/* Mobile cards */}
               <div className="divide-y divide-white/5 md:hidden">
-                {articles.map((article) => (
+                {filteredArticles.map((article) => (
                   <div
                     key={article.id}
                     className="p-5"
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <h2 className="font-semibold">
-                          {article.title}
-                        </h2>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h2 className="font-semibold">
+                            {article.title}
+                          </h2>
+
+                          {article.featured && (
+                            <span className="rounded-full bg-cyan-400/10 px-2.5 py-1 text-[11px] font-semibold text-cyan-400">
+                              ★ Featured
+                            </span>
+                          )}
+                        </div>
 
                         <p className="mt-1 text-sm text-zinc-600">
                           {article.category}
@@ -382,6 +659,16 @@ export default function ManageArticlesPage() {
                     </p>
 
                     <div className="mt-4 flex flex-wrap gap-2">
+                      {article.status === "published" && (
+                        <Link
+                          href={`/article/${article.slug}`}
+                          target="_blank"
+                          className="rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-zinc-300"
+                        >
+                          View
+                        </Link>
+                      )}
+
                       <Link
                         href={`/admin/articles/${article.id}/edit`}
                         className="rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-zinc-300"
@@ -390,6 +677,26 @@ export default function ManageArticlesPage() {
                       </Link>
 
                       <button
+                        type="button"
+                        onClick={() =>
+                          toggleFeatured(article)
+                        }
+                        disabled={busyId === article.id}
+                        className={`rounded-lg border px-3 py-2 text-xs font-medium disabled:opacity-50 ${
+                          article.featured
+                            ? "border-cyan-400/30 bg-cyan-400/10 text-cyan-400"
+                            : "border-white/10 text-zinc-400"
+                        }`}
+                      >
+                        {busyId === article.id
+                          ? "..."
+                          : article.featured
+                            ? "Unfeature"
+                            : "Feature"}
+                      </button>
+
+                      <button
+                        type="button"
                         onClick={() =>
                           togglePublish(article)
                         }
@@ -402,6 +709,7 @@ export default function ManageArticlesPage() {
                       </button>
 
                       <button
+                        type="button"
                         onClick={() =>
                           deleteArticle(article)
                         }
