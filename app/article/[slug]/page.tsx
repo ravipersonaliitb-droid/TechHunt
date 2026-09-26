@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import ReactMarkdown from "react-markdown";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import ShareButton from "./ShareButton";
 import { supabase } from "../../../lib/supabase/server";
@@ -54,8 +55,11 @@ async function getRelatedArticles(
   }
 
   const sortedArticles = [...(articles ?? [])].sort((a, b) => {
-    const aSameCategory = a.category === currentCategory ? 1 : 0;
-    const bSameCategory = b.category === currentCategory ? 1 : 0;
+    const aSameCategory =
+      a.category === currentCategory ? 1 : 0;
+
+    const bSameCategory =
+      b.category === currentCategory ? 1 : 0;
 
     if (aSameCategory !== bSameCategory) {
       return bSameCategory - aSameCategory;
@@ -112,7 +116,8 @@ export async function generateMetadata({
     article.excerpt ||
     `Read the latest ${article.category} technology story on TechHunt.`;
 
-  const articleUrl = `${siteUrl}/article/${article.slug}`;
+  const articleUrl =
+    `${siteUrl}/article/${article.slug}`;
 
   const metadata: Metadata = {
     title: article.title,
@@ -153,14 +158,17 @@ export async function generateMetadata({
       locale: "en_IN",
 
       publishedTime:
-        article.published_at ?? article.created_at,
+        article.published_at ??
+        article.created_at,
 
       modifiedTime:
         article.updated_at ??
         article.published_at ??
         article.created_at,
 
-      authors: [article.author || "TechHunt"],
+      authors: [
+        article.author || "TechHunt",
+      ],
 
       section: article.category,
 
@@ -199,33 +207,66 @@ export async function generateMetadata({
 }
 
 /* --------------------------------
-   Article Content Helpers
+   Legacy Heading Helper
 --------------------------------- */
 
-function getHeadingLevel(text: string) {
-  const clean = text.trim();
+/*
+ * Older TechHunt articles may contain headings
+ * without Markdown markers.
+ *
+ * Example:
+ *
+ * What Are AI Agents?
+ *
+ * This helper converts those older heading-style
+ * lines into Markdown H2 headings before rendering.
+ */
+function normalizeLegacyHeadings(content: string) {
+  return content
+    .split("\n")
+    .map((line) => {
+      const trimmed = line.trim();
 
-  if (clean.startsWith("### ")) return 3;
-  if (clean.startsWith("## ")) return 2;
+      if (!trimmed) {
+        return line;
+      }
 
-  /*
-    Preserve the previous behavior for headings
-    that were written without Markdown markers.
-  */
-  if (
-    clean &&
-    clean.length <= 80 &&
-    !/[.!?,;:]$/.test(clean) &&
-    !clean.includes("→")
-  ) {
-    return 2;
-  }
+      /*
+       * Already valid Markdown:
+       * Leave it unchanged.
+       */
+      if (
+        trimmed.startsWith("# ") ||
+        trimmed.startsWith("## ") ||
+        trimmed.startsWith("### ") ||
+        trimmed.startsWith("#### ") ||
+        trimmed.startsWith("- ") ||
+        trimmed.startsWith("* ") ||
+        trimmed.startsWith("+ ") ||
+        /^\d+\.\s/.test(trimmed)
+      ) {
+        return line;
+      }
 
-  return 0;
-}
+      /*
+       * Preserve the previous TechHunt behavior:
+       * short lines without sentence-ending punctuation
+       * were treated as headings.
+       */
+      if (
+        trimmed.length <= 80 &&
+        !/[.!?,;:]$/.test(trimmed) &&
+        !trimmed.includes("→") &&
+        !trimmed.startsWith("**") &&
+        !trimmed.startsWith("*") &&
+        !trimmed.startsWith("[")
+      ) {
+        return `## ${trimmed}`;
+      }
 
-function cleanHeadingText(text: string) {
-  return text.trim().replace(/^#{2,3}\s+/, "");
+      return line;
+    })
+    .join("\n");
 }
 
 /* --------------------------------
@@ -233,17 +274,20 @@ function cleanHeadingText(text: string) {
 --------------------------------- */
 
 function createArticleStructuredData(article: any) {
-  const articleUrl = `${siteUrl}/article/${article.slug}`;
+  const articleUrl =
+    `${siteUrl}/article/${article.slug}`;
 
   const publishedDate =
-    article.published_at ?? article.created_at;
+    article.published_at ??
+    article.created_at;
 
   const modifiedDate =
     article.updated_at ??
     article.published_at ??
     article.created_at;
 
-  const authorName = article.author || "TechHunt";
+  const authorName =
+    article.author || "TechHunt";
 
   const author =
     authorName === "TechHunt"
@@ -257,7 +301,10 @@ function createArticleStructuredData(article: any) {
           name: authorName,
         };
 
-  const structuredData: Record<string, unknown> = {
+  const structuredData: Record<
+    string,
+    unknown
+  > = {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
 
@@ -300,7 +347,9 @@ function createArticleStructuredData(article: any) {
   };
 
   if (article.image_url) {
-    structuredData.image = [article.image_url];
+    structuredData.image = [
+      article.image_url,
+    ];
   }
 
   return structuredData;
@@ -328,8 +377,8 @@ export default async function ArticlePage({
           </h1>
 
           <p className="mt-4 text-zinc-400">
-            This article may have been removed, unpublished, or does
-            not exist.
+            This article may have been removed,
+            unpublished, or does not exist.
           </p>
 
           <Link
@@ -344,21 +393,29 @@ export default async function ArticlePage({
     );
   }
 
-  const relatedArticles = await getRelatedArticles(
-    article.slug,
-    article.category
-  );
+  const relatedArticles =
+    await getRelatedArticles(
+      article.slug,
+      article.category
+    );
 
-  const structuredData = createArticleStructuredData(article);
+  const structuredData =
+    createArticleStructuredData(article);
 
   const publishedDate = formatDate(
-    article.published_at ?? article.created_at
+    article.published_at ??
+      article.created_at
   );
 
-  const paragraphs = article.content
-    .split(/\n\s*\n/)
-    .map((paragraph: string) => paragraph.trim())
-    .filter(Boolean);
+  /*
+   * Normalize older plain-text headings,
+   * while preserving the Markdown created
+   * by the new article editor.
+   */
+  const markdownContent =
+    normalizeLegacyHeadings(
+      article.content
+    );
 
   return (
     <main className="min-h-screen bg-[#07090d] text-white">
@@ -366,21 +423,28 @@ export default async function ArticlePage({
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(structuredData).replace(
-            /</g,
-            "\\u003c"
-          ),
+          __html: JSON.stringify(
+            structuredData
+          ).replace(/</g, "\\u003c"),
         }}
       />
 
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-white/10 bg-[#07090d]/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="logo-mark">T</div>
+          <Link
+            href="/"
+            className="flex items-center gap-2"
+          >
+            <div className="logo-mark">
+              T
+            </div>
 
             <span className="text-xl font-black tracking-tight">
-              Tech<span className="text-cyan-400">Hunt</span>
+              Tech
+              <span className="text-cyan-400">
+                Hunt
+              </span>
             </span>
           </Link>
 
@@ -420,13 +484,16 @@ export default async function ArticlePage({
           <span>
             By{" "}
             <span className="font-semibold text-zinc-300">
-              {article.author || "TechHunt"}
+              {article.author ||
+                "TechHunt"}
             </span>
           </span>
 
           <span>•</span>
 
-          <span>{publishedDate}</span>
+          <span>
+            {publishedDate}
+          </span>
 
           <ShareButton
             title={article.title}
@@ -464,44 +531,154 @@ export default async function ArticlePage({
 
         {/* Article Content */}
         <div className="mx-auto mt-14 max-w-5xl">
-          <div className="mx-auto max-w-3xl space-y-8">
-            {paragraphs.map(
-              (paragraph: string, index: number) => {
-                const headingLevel = getHeadingLevel(paragraph);
-                const headingText = cleanHeadingText(paragraph);
-
-                if (headingLevel === 3) {
+          <div className="mx-auto max-w-3xl">
+            <ReactMarkdown
+              components={{
+                /*
+                 * H1 from Markdown is rendered as H2
+                 * so the article still has one main H1.
+                 */
+                h1({ children }) {
                   return (
-                    <h3
-                      key={index}
-                      className="pt-5 text-xl font-black leading-tight tracking-tight text-white sm:text-2xl"
-                    >
-                      {headingText}
-                    </h3>
-                  );
-                }
-
-                if (headingLevel === 2) {
-                  return (
-                    <h2
-                      key={index}
-                      className="pt-5 text-2xl font-black leading-tight tracking-tight text-white sm:text-3xl"
-                    >
-                      {headingText}
+                    <h2 className="mb-6 mt-12 text-3xl font-black leading-tight tracking-tight text-white sm:text-4xl">
+                      {children}
                     </h2>
                   );
-                }
+                },
 
-                return (
-                  <p
-                    key={index}
-                    className="text-[17px] leading-8 text-zinc-300 sm:text-[18px] sm:leading-9"
-                  >
-                    {paragraph}
-                  </p>
-                );
-              }
-            )}
+                h2({ children }) {
+                  return (
+                    <h2 className="mb-5 mt-12 text-2xl font-black leading-tight tracking-tight text-white sm:text-3xl">
+                      {children}
+                    </h2>
+                  );
+                },
+
+                h3({ children }) {
+                  return (
+                    <h3 className="mb-4 mt-10 text-xl font-black leading-tight tracking-tight text-white sm:text-2xl">
+                      {children}
+                    </h3>
+                  );
+                },
+
+                h4({ children }) {
+                  return (
+                    <h4 className="mb-3 mt-8 text-lg font-bold leading-tight text-white sm:text-xl">
+                      {children}
+                    </h4>
+                  );
+                },
+
+                p({ children }) {
+                  return (
+                    <p className="mb-7 text-[17px] leading-8 text-zinc-300 sm:text-[18px] sm:leading-9">
+                      {children}
+                    </p>
+                  );
+                },
+
+                strong({ children }) {
+                  return (
+                    <strong className="font-bold text-white">
+                      {children}
+                    </strong>
+                  );
+                },
+
+                em({ children }) {
+                  return (
+                    <em className="italic text-zinc-200">
+                      {children}
+                    </em>
+                  );
+                },
+
+                ul({ children }) {
+                  return (
+                    <ul className="mb-8 ml-6 list-disc space-y-3 text-[17px] leading-8 text-zinc-300 sm:text-[18px]">
+                      {children}
+                    </ul>
+                  );
+                },
+
+                ol({ children }) {
+                  return (
+                    <ol className="mb-8 ml-6 list-decimal space-y-3 text-[17px] leading-8 text-zinc-300 sm:text-[18px]">
+                      {children}
+                    </ol>
+                  );
+                },
+
+                li({ children }) {
+                  return (
+                    <li className="pl-2">
+                      {children}
+                    </li>
+                  );
+                },
+
+                a({
+                  href,
+                  children,
+                  ...props
+                }) {
+                  const isExternal =
+                    href?.startsWith(
+                      "http://"
+                    ) ||
+                    href?.startsWith(
+                      "https://"
+                    );
+
+                  return (
+                    <a
+                      {...props}
+                      href={href}
+                      target={
+                        isExternal
+                          ? "_blank"
+                          : undefined
+                      }
+                      rel={
+                        isExternal
+                          ? "noopener noreferrer"
+                          : undefined
+                      }
+                      className="font-semibold text-cyan-400 underline decoration-cyan-400/40 underline-offset-4 transition hover:text-cyan-300"
+                    >
+                      {children}
+                    </a>
+                  );
+                },
+
+                blockquote({ children }) {
+                  return (
+                    <blockquote className="my-8 border-l-4 border-cyan-400/50 bg-white/[0.03] px-6 py-4 text-zinc-300">
+                      {children}
+                    </blockquote>
+                  );
+                },
+
+                hr() {
+                  return (
+                    <hr className="my-10 border-white/10" />
+                  );
+                },
+
+                code({
+                  children,
+                }) {
+                  return (
+                    <code className="rounded-md border border-white/10 bg-white/[0.06] px-1.5 py-0.5 font-mono text-sm text-cyan-300">
+                      {children}
+                    </code>
+                  );
+                },
+              }}
+            >
+              {markdownContent}
+            </ReactMarkdown>
           </div>
 
           {/* Related Articles */}
@@ -520,69 +697,85 @@ export default async function ArticlePage({
               </div>
 
               <div className="grid gap-6 md:grid-cols-3">
-                {relatedArticles.map((relatedArticle) => (
-                  <Link
-                    key={relatedArticle.id ?? relatedArticle.slug}
-                    href={`/article/${relatedArticle.slug}`}
-                    className="group overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] transition duration-300 hover:-translate-y-1 hover:border-cyan-400/30 hover:bg-white/[0.05]"
-                  >
-                    {/* Card Image */}
-                    <div className="relative aspect-[16/10] overflow-hidden bg-[#10141c]">
-                      {relatedArticle.image_url ? (
-                        <img
-                          src={relatedArticle.image_url}
-                          alt={relatedArticle.title}
-                          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                        />
-                      ) : (
-                        <div className="article-hero h-full">
-                          <div className="article-hero-grid" />
-                          <div className="article-orb" />
+                {relatedArticles.map(
+                  (relatedArticle) => (
+                    <Link
+                      key={
+                        relatedArticle.id ??
+                        relatedArticle.slug
+                      }
+                      href={`/article/${relatedArticle.slug}`}
+                      className="group overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] transition duration-300 hover:-translate-y-1 hover:border-cyan-400/30 hover:bg-white/[0.05]"
+                    >
+                      {/* Card Image */}
+                      <div className="relative aspect-[16/10] overflow-hidden bg-[#10141c]">
+                        {relatedArticle.image_url ? (
+                          <img
+                            src={
+                              relatedArticle.image_url
+                            }
+                            alt={
+                              relatedArticle.title
+                            }
+                            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="article-hero h-full">
+                            <div className="article-hero-grid" />
+                            <div className="article-orb" />
 
-                          <div className="relative z-10 flex h-full items-end p-5">
-                            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400">
-                              TechHunt
-                            </span>
+                            <div className="relative z-10 flex h-full items-end p-5">
+                              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400">
+                                TechHunt
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      )}
-
-                      <div className="absolute left-3 top-3">
-                        <span className="rounded-full border border-cyan-400/30 bg-black/70 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300 backdrop-blur-md">
-                          {relatedArticle.category}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Card Content */}
-                    <div className="p-5">
-                      <p className="text-xs text-zinc-500">
-                        {formatDate(
-                          relatedArticle.published_at ??
-                            relatedArticle.created_at
                         )}
-                      </p>
 
-                      <h3 className="mt-2 line-clamp-3 text-lg font-black leading-tight text-white transition group-hover:text-cyan-300">
-                        {relatedArticle.title}
-                      </h3>
-
-                      {relatedArticle.excerpt && (
-                        <p className="mt-3 line-clamp-2 text-sm leading-6 text-zinc-500">
-                          {relatedArticle.excerpt}
-                        </p>
-                      )}
-
-                      <div className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-cyan-400">
-                        Read article
-                        <ArrowRight
-                          size={15}
-                          className="transition-transform duration-300 group-hover:translate-x-1"
-                        />
+                        <div className="absolute left-3 top-3">
+                          <span className="rounded-full border border-cyan-400/30 bg-black/70 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300 backdrop-blur-md">
+                            {
+                              relatedArticle.category
+                            }
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  </Link>
-                ))}
+
+                      {/* Card Content */}
+                      <div className="p-5">
+                        <p className="text-xs text-zinc-500">
+                          {formatDate(
+                            relatedArticle.published_at ??
+                              relatedArticle.created_at
+                          )}
+                        </p>
+
+                        <h3 className="mt-2 line-clamp-3 text-lg font-black leading-tight text-white transition group-hover:text-cyan-300">
+                          {
+                            relatedArticle.title
+                          }
+                        </h3>
+
+                        {relatedArticle.excerpt && (
+                          <p className="mt-3 line-clamp-2 text-sm leading-6 text-zinc-500">
+                            {
+                              relatedArticle.excerpt
+                            }
+                          </p>
+                        )}
+
+                        <div className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-cyan-400">
+                          Read article
+
+                          <ArrowRight
+                            size={15}
+                            className="transition-transform duration-300 group-hover:translate-x-1"
+                          />
+                        </div>
+                      </div>
+                    </Link>
+                  )
+                )}
               </div>
             </section>
           )}
@@ -605,7 +798,10 @@ export default async function ArticlePage({
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-8 text-sm text-zinc-500 sm:flex-row sm:items-center sm:justify-between">
           <Link href="/">
             <span className="font-black text-white">
-              Tech<span className="text-cyan-400">Hunt</span>
+              Tech
+              <span className="text-cyan-400">
+                Hunt
+              </span>
             </span>
           </Link>
 

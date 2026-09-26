@@ -1,6 +1,11 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import {
+  FormEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "../../../../lib/supabase/client";
@@ -29,7 +34,11 @@ export default function CreateArticlePage() {
   const [author, setAuthor] = useState("TechHunt");
   const [excerpt, setExcerpt] = useState("");
   const [content, setContent] = useState("");
-  const [status, setStatus] = useState<"draft" | "published">("draft");
+
+  const [status, setStatus] = useState<"draft" | "published">(
+    "draft"
+  );
+
   const [featured, setFeatured] = useState(false);
 
   const [image, setImage] = useState<File | null>(null);
@@ -39,8 +48,11 @@ export default function CreateArticlePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  const contentRef = useRef<HTMLTextAreaElement | null>(null);
+
   const titleCount = title.length;
   const excerptCount = excerpt.length;
+
   const wordCount = content.trim()
     ? content.trim().split(/\s+/).length
     : 0;
@@ -173,6 +185,331 @@ export default function CreateArticlePage() {
     return data.publicUrl;
   }
 
+  /*
+   * Insert inline Markdown formatting.
+   *
+   * Used for:
+   * - Bold
+   * - Italic
+   *
+   * If text is selected, formatting is applied around
+   * the selected text.
+   *
+   * If nothing is selected, a placeholder is inserted.
+   */
+  function insertFormatting(
+    prefix: string,
+    suffix = "",
+    placeholder = "text"
+  ) {
+    const textarea = contentRef.current;
+
+    if (!textarea) {
+      return;
+    }
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+
+    const selectedText = content.slice(start, end);
+
+    const textToInsert =
+      selectedText || placeholder;
+
+    const replacement =
+      prefix + textToInsert + suffix;
+
+    const newContent =
+      content.slice(0, start) +
+      replacement +
+      content.slice(end);
+
+    setContent(newContent);
+
+    requestAnimationFrame(() => {
+      textarea.focus();
+
+      const selectionStart =
+        start + prefix.length;
+
+      const selectionEnd =
+        selectionStart + textToInsert.length;
+
+      textarea.setSelectionRange(
+        selectionStart,
+        selectionEnd
+      );
+    });
+  }
+
+  /*
+   * Insert a block-level Markdown element.
+   *
+   * Used for:
+   * - H2
+   * - H3
+   *
+   * The current line is formatted instead of simply
+   * inserting Markdown at the cursor position.
+   */
+  function insertBlock(
+    prefix: string,
+    placeholder = "Heading"
+  ) {
+    const textarea = contentRef.current;
+
+    if (!textarea) {
+      return;
+    }
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+
+    /*
+     * Find the complete line containing the cursor/selection.
+     */
+    const lineStart =
+      content.lastIndexOf("\n", start - 1) + 1;
+
+    const lineEndIndex =
+      content.indexOf("\n", end);
+
+    const lineEnd =
+      lineEndIndex === -1
+        ? content.length
+        : lineEndIndex;
+
+    /*
+     * Get the complete block of selected lines.
+     */
+    const selectedBlock =
+      content.slice(lineStart, lineEnd);
+
+    /*
+     * Remove existing Markdown prefixes if the
+     * user changes an existing heading/list into H2/H3.
+     */
+    const lines = selectedBlock.split("\n");
+
+    const cleanedLines = lines.map((line) =>
+      line.replace(
+        /^(#{1,6}\s+|[-*+]\s+|\d+\.\s+)/,
+        ""
+      )
+    );
+
+    /*
+     * If the line is empty, provide a useful placeholder.
+     */
+    if (
+      cleanedLines.length === 1 &&
+      !cleanedLines[0].trim()
+    ) {
+      cleanedLines[0] = placeholder;
+    }
+
+    const formattedBlock = cleanedLines
+      .map((line) => `${prefix}${line}`)
+      .join("\n");
+
+    const newContent =
+      content.slice(0, lineStart) +
+      formattedBlock +
+      content.slice(lineEnd);
+
+    setContent(newContent);
+
+    requestAnimationFrame(() => {
+      textarea.focus();
+
+      const cursorPosition =
+        lineStart + formattedBlock.length;
+
+      textarea.setSelectionRange(
+        cursorPosition,
+        cursorPosition
+      );
+    });
+  }
+
+  /*
+   * Insert a list.
+   *
+   * Supports:
+   * - Bullet lists
+   * - Numbered lists
+   *
+   * The current line or selected lines are converted
+   * into separate list items.
+   */
+  function insertList(
+    type: "bullet" | "numbered",
+    placeholder = "List item"
+  ) {
+    const textarea = contentRef.current;
+
+    if (!textarea) {
+      return;
+    }
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+
+    /*
+     * Find complete line boundaries.
+     */
+    const lineStart =
+      content.lastIndexOf("\n", start - 1) + 1;
+
+    const lineEndIndex =
+      content.indexOf("\n", end);
+
+    const lineEnd =
+      lineEndIndex === -1
+        ? content.length
+        : lineEndIndex;
+
+    const selectedBlock =
+      content.slice(lineStart, lineEnd);
+
+    /*
+     * Remove existing heading/list Markdown
+     * before applying the new list type.
+     */
+    let lines = selectedBlock
+      .split("\n")
+      .map((line) =>
+        line.replace(
+          /^(#{1,6}\s+|[-*+]\s+|\d+\.\s+)/,
+          ""
+        )
+      );
+
+    /*
+     * If the current line is empty, use a placeholder.
+     */
+    if (
+      lines.length === 1 &&
+      !lines[0].trim()
+    ) {
+      lines = [placeholder];
+    }
+
+    let formattedLines: string[];
+
+    if (type === "bullet") {
+      formattedLines = lines.map(
+        (line) => `- ${line}`
+      );
+    } else {
+      formattedLines = lines.map(
+        (line, index) =>
+          `${index + 1}. ${line}`
+      );
+    }
+
+    const formattedBlock =
+      formattedLines.join("\n");
+
+    const newContent =
+      content.slice(0, lineStart) +
+      formattedBlock +
+      content.slice(lineEnd);
+
+    setContent(newContent);
+
+    requestAnimationFrame(() => {
+      textarea.focus();
+
+      const cursorPosition =
+        lineStart + formattedBlock.length;
+
+      textarea.setSelectionRange(
+        cursorPosition,
+        cursorPosition
+      );
+    });
+  }
+
+  /*
+   * Insert a Markdown link.
+   */
+  function insertLink() {
+    const textarea = contentRef.current;
+
+    if (!textarea) {
+      return;
+    }
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+
+    const selectedText =
+      content.slice(start, end);
+
+    const linkText =
+      selectedText || "link text";
+
+    /*
+     * Put the link on its own Markdown block.
+     * This prevents it from becoming part of a
+     * numbered or bullet list.
+     */
+    const beforeText = content.slice(0, start);
+    const afterText = content.slice(end);
+
+    const needsLeadingBreak =
+      beforeText.length > 0 &&
+      !beforeText.endsWith("\n\n");
+
+    const leadingBreak =
+      beforeText.length === 0
+        ? ""
+        : needsLeadingBreak
+          ? "\n\n"
+          : "";
+
+    const trailingBreak =
+      afterText.length === 0 ||
+      afterText.startsWith("\n\n")
+        ? ""
+        : "\n\n";
+
+    const replacement =
+      `${leadingBreak}[${linkText}](https://example.com)${trailingBreak}`;
+
+    const newContent =
+      beforeText +
+      replacement +
+      afterText;
+
+    setContent(newContent);
+
+    requestAnimationFrame(() => {
+      textarea.focus();
+
+      /*
+       * Select only the example URL so the user
+       * can immediately replace it.
+       */
+      const urlStart =
+        start +
+        leadingBreak.length +
+        1 +
+        linkText.length +
+        2;
+
+      const urlEnd =
+        urlStart +
+        "https://example.com".length;
+
+      textarea.setSelectionRange(
+        urlStart,
+        urlEnd
+      );
+    });
+  }
+
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>
   ) {
@@ -186,10 +523,14 @@ export default function CreateArticlePage() {
       const cleanSlug = slug.trim();
       const cleanExcerpt = excerpt.trim();
       const cleanContent = content.trim();
-      const cleanAuthor = author.trim() || "TechHunt";
+
+      const cleanAuthor =
+        author.trim() || "TechHunt";
 
       if (!cleanTitle) {
-        throw new Error("Please enter an article title.");
+        throw new Error(
+          "Please enter an article title."
+        );
       }
 
       if (cleanTitle.length < 10) {
@@ -199,17 +540,25 @@ export default function CreateArticlePage() {
       }
 
       if (!cleanSlug) {
-        throw new Error("Please enter an article slug.");
+        throw new Error(
+          "Please enter an article slug."
+        );
       }
 
-      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(cleanSlug)) {
+      if (
+        !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(
+          cleanSlug
+        )
+      ) {
         throw new Error(
           "Slug can contain only lowercase letters, numbers, and hyphens."
         );
       }
 
       if (!cleanExcerpt) {
-        throw new Error("Please enter an article excerpt.");
+        throw new Error(
+          "Please enter an article excerpt."
+        );
       }
 
       if (cleanExcerpt.length < 30) {
@@ -219,7 +568,9 @@ export default function CreateArticlePage() {
       }
 
       if (!cleanContent) {
-        throw new Error("Please enter article content.");
+        throw new Error(
+          "Please enter article content."
+        );
       }
 
       if (cleanContent.length < 100) {
@@ -228,8 +579,10 @@ export default function CreateArticlePage() {
         );
       }
 
-      const { data: userData, error: userError } =
-        await supabase.auth.getUser();
+      const {
+        data: userData,
+        error: userError,
+      } = await supabase.auth.getUser();
 
       if (userError || !userData.user) {
         throw new Error(
@@ -237,16 +590,22 @@ export default function CreateArticlePage() {
         );
       }
 
-      // Check whether the slug already exists.
-      const { data: existingArticle, error: slugCheckError } =
-        await supabase
-          .from("articles")
-          .select("id")
-          .eq("slug", cleanSlug)
-          .maybeSingle();
+      /*
+       * Check whether the slug already exists.
+       */
+      const {
+        data: existingArticle,
+        error: slugCheckError,
+      } = await supabase
+        .from("articles")
+        .select("id")
+        .eq("slug", cleanSlug)
+        .maybeSingle();
 
       if (slugCheckError) {
-        throw new Error(slugCheckError.message);
+        throw new Error(
+          slugCheckError.message
+        );
       }
 
       if (existingArticle) {
@@ -255,49 +614,68 @@ export default function CreateArticlePage() {
         );
       }
 
-      let finalImageUrl = imageUrl.trim();
+      let finalImageUrl =
+        imageUrl.trim();
 
       if (image) {
-        finalImageUrl = await uploadImage();
+        finalImageUrl =
+          await uploadImage();
       }
 
-      // Create the article first.
-      const { data: insertedArticle, error: insertError } =
-        await supabase
-          .from("articles")
-          .insert({
-            slug: cleanSlug,
-            title: cleanTitle,
-            excerpt: cleanExcerpt,
-            content: cleanContent,
-            category,
-            author: cleanAuthor,
-            image_url: finalImageUrl || null,
-            status,
-            featured: false,
-            published_at:
-              status === "published"
-                ? new Date().toISOString()
-                : null,
-          })
-          .select("id")
-          .single();
+      /*
+       * Create the article first.
+       */
+      const {
+        data: insertedArticle,
+        error: insertError,
+      } = await supabase
+        .from("articles")
+        .insert({
+          slug: cleanSlug,
+          title: cleanTitle,
+          excerpt: cleanExcerpt,
+          content: cleanContent,
+          category,
+          author: cleanAuthor,
+          image_url:
+            finalImageUrl || null,
+          status,
+          featured: false,
+          published_at:
+            status === "published"
+              ? new Date().toISOString()
+              : null,
+        })
+        .select("id")
+        .single();
 
-      if (insertError || !insertedArticle) {
+      if (
+        insertError ||
+        !insertedArticle
+      ) {
         throw new Error(
           insertError?.message ||
             "Article could not be created."
         );
       }
 
-      // If this article is being featured, remove Featured
-      // status from other articles first.
+      /*
+       * If this article is being featured,
+       * remove Featured status from other articles first.
+       */
       if (featured) {
-        const { error: clearFeaturedError } = await supabase
+        const {
+          error: clearFeaturedError,
+        } = await supabase
           .from("articles")
-          .update({ featured: false })
+          .update({
+            featured: false,
+          })
           .eq("featured", true)
-          .neq("id", insertedArticle.id);
+          .neq(
+            "id",
+            insertedArticle.id
+          );
 
         if (clearFeaturedError) {
           throw new Error(
@@ -305,10 +683,17 @@ export default function CreateArticlePage() {
           );
         }
 
-        const { error: featureError } = await supabase
+        const {
+          error: featureError,
+        } = await supabase
           .from("articles")
-          .update({ featured: true })
-          .eq("id", insertedArticle.id);
+          .update({
+            featured: true,
+          })
+          .eq(
+            "id",
+            insertedArticle.id
+          );
 
         if (featureError) {
           throw new Error(
@@ -317,7 +702,10 @@ export default function CreateArticlePage() {
         }
       }
 
-      router.push("/admin/articles");
+      router.push(
+        "/admin/articles"
+      );
+
       router.refresh();
     } catch (err) {
       setError(
@@ -339,7 +727,10 @@ export default function CreateArticlePage() {
             href="/"
             className="text-2xl font-bold tracking-tight"
           >
-            Tech<span className="text-cyan-400">Hunt</span>
+            Tech
+            <span className="text-cyan-400">
+              Hunt
+            </span>
           </Link>
 
           <Link
@@ -414,12 +805,14 @@ export default function CreateArticlePage() {
 
                   <span
                     className={`text-xs ${
-                      titleCount >= MAX_TITLE_LENGTH
+                      titleCount >=
+                      MAX_TITLE_LENGTH
                         ? "text-red-400"
                         : "text-zinc-600"
                     }`}
                   >
-                    {titleCount}/{MAX_TITLE_LENGTH}
+                    {titleCount}/
+                    {MAX_TITLE_LENGTH}
                   </span>
                 </div>
 
@@ -427,10 +820,14 @@ export default function CreateArticlePage() {
                   id="title"
                   type="text"
                   value={title}
-                  maxLength={MAX_TITLE_LENGTH}
+                  maxLength={
+                    MAX_TITLE_LENGTH
+                  }
                   required
                   onChange={(event) =>
-                    handleTitleChange(event.target.value)
+                    handleTitleChange(
+                      event.target.value
+                    )
                   }
                   placeholder="Enter article title"
                   className="w-full rounded-xl border border-white/10 bg-black px-4 py-4 text-white outline-none transition placeholder:text-zinc-600 focus:border-cyan-400"
@@ -462,7 +859,9 @@ export default function CreateArticlePage() {
                     value={slug}
                     required
                     onChange={(event) =>
-                      handleSlugChange(event.target.value)
+                      handleSlugChange(
+                        event.target.value
+                      )
                     }
                     placeholder="article-url-slug"
                     className="w-full bg-transparent px-4 py-4 text-white outline-none placeholder:text-zinc-600 sm:px-0"
@@ -489,15 +888,22 @@ export default function CreateArticlePage() {
                     id="category"
                     value={category}
                     onChange={(event) =>
-                      setCategory(event.target.value)
+                      setCategory(
+                        event.target.value
+                      )
                     }
                     className="w-full rounded-xl border border-white/10 bg-black px-4 py-4 text-white outline-none focus:border-cyan-400"
                   >
-                    {categories.map((item) => (
-                      <option key={item} value={item}>
-                        {item}
-                      </option>
-                    ))}
+                    {categories.map(
+                      (item) => (
+                        <option
+                          key={item}
+                          value={item}
+                        >
+                          {item}
+                        </option>
+                      )
+                    )}
                   </select>
                 </div>
 
@@ -514,7 +920,9 @@ export default function CreateArticlePage() {
                     type="text"
                     value={author}
                     onChange={(event) =>
-                      setAuthor(event.target.value)
+                      setAuthor(
+                        event.target.value
+                      )
                     }
                     placeholder="TechHunt"
                     className="w-full rounded-xl border border-white/10 bg-black px-4 py-4 text-white outline-none focus:border-cyan-400"
@@ -534,12 +942,14 @@ export default function CreateArticlePage() {
 
                   <span
                     className={`text-xs ${
-                      excerptCount >= MAX_EXCERPT_LENGTH
+                      excerptCount >=
+                      MAX_EXCERPT_LENGTH
                         ? "text-red-400"
                         : "text-zinc-600"
                     }`}
                   >
-                    {excerptCount}/{MAX_EXCERPT_LENGTH}
+                    {excerptCount}/
+                    {MAX_EXCERPT_LENGTH}
                   </span>
                 </div>
 
@@ -547,9 +957,13 @@ export default function CreateArticlePage() {
                   id="excerpt"
                   value={excerpt}
                   onChange={(event) =>
-                    handleExcerptChange(event.target.value)
+                    handleExcerptChange(
+                      event.target.value
+                    )
                   }
-                  maxLength={MAX_EXCERPT_LENGTH}
+                  maxLength={
+                    MAX_EXCERPT_LENGTH
+                  }
                   rows={4}
                   required
                   placeholder="Write a short summary of the article..."
@@ -574,7 +988,8 @@ export default function CreateArticlePage() {
                     accept="image/png,image/jpeg,image/webp,image/gif"
                     onChange={(event) =>
                       handleImageChange(
-                        event.target.files?.[0] || null
+                        event.target.files?.[0] ||
+                          null
                       )
                     }
                     className="block w-full text-sm text-zinc-400 file:mr-4 file:rounded-lg file:border-0 file:bg-cyan-400 file:px-4 file:py-2 file:font-semibold file:text-black"
@@ -586,9 +1001,11 @@ export default function CreateArticlePage() {
 
                   <div className="my-5 flex items-center gap-3">
                     <div className="h-px flex-1 bg-white/10" />
+
                     <span className="text-xs uppercase tracking-wider text-zinc-600">
                       or use image URL
                     </span>
+
                     <div className="h-px flex-1 bg-white/10" />
                   </div>
 
@@ -596,7 +1013,9 @@ export default function CreateArticlePage() {
                     type="url"
                     value={imageUrl}
                     onChange={(event) =>
-                      handleImageUrlChange(event.target.value)
+                      handleImageUrlChange(
+                        event.target.value
+                      )
                     }
                     placeholder="https://example.com/image.jpg"
                     className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-cyan-400"
@@ -650,22 +1069,142 @@ export default function CreateArticlePage() {
                   </span>
                 </div>
 
+                {/* Formatting Toolbar */}
+                <div className="rounded-t-xl border border-white/10 bg-[#0b0d12] p-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* H2 */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        insertBlock(
+                          "## ",
+                          "Heading"
+                        )
+                      }
+                      className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-bold text-zinc-300 transition hover:border-cyan-400/40 hover:bg-cyan-400/10 hover:text-cyan-300"
+                      title="Heading 2"
+                    >
+                      H2
+                    </button>
+
+                    {/* H3 */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        insertBlock(
+                          "### ",
+                          "Subheading"
+                        )
+                      }
+                      className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-bold text-zinc-300 transition hover:border-cyan-400/40 hover:bg-cyan-400/10 hover:text-cyan-300"
+                      title="Heading 3"
+                    >
+                      H3
+                    </button>
+
+                    <div className="h-6 w-px bg-white/10" />
+
+                    {/* Bold */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        insertFormatting(
+                          "**",
+                          "**",
+                          "bold text"
+                        )
+                      }
+                      className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm font-bold text-zinc-300 transition hover:border-cyan-400/40 hover:bg-cyan-400/10 hover:text-cyan-300"
+                      title="Bold"
+                    >
+                      B
+                    </button>
+
+                    {/* Italic */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        insertFormatting(
+                          "*",
+                          "*",
+                          "italic text"
+                        )
+                      }
+                      className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm italic text-zinc-300 transition hover:border-cyan-400/40 hover:bg-cyan-400/10 hover:text-cyan-300"
+                      title="Italic"
+                    >
+                      I
+                    </button>
+
+                    <div className="h-6 w-px bg-white/10" />
+
+                    {/* Bullet List */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        insertList(
+                          "bullet",
+                          "List item"
+                        )
+                      }
+                      className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm font-bold text-zinc-300 transition hover:border-cyan-400/40 hover:bg-cyan-400/10 hover:text-cyan-300"
+                      title="Bullet list"
+                    >
+                      • List
+                    </button>
+
+                    {/* Numbered List */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        insertList(
+                          "numbered",
+                          "List item"
+                        )
+                      }
+                      className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm font-bold text-zinc-300 transition hover:border-cyan-400/40 hover:bg-cyan-400/10 hover:text-cyan-300"
+                      title="Numbered list"
+                    >
+                      1. List
+                    </button>
+
+                    {/* Link */}
+                    <button
+                      type="button"
+                      onClick={insertLink}
+                      className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm font-bold text-zinc-300 transition hover:border-cyan-400/40 hover:bg-cyan-400/10 hover:text-cyan-300"
+                      title="Insert link"
+                    >
+                      Link
+                    </button>
+                  </div>
+                </div>
+
                 <textarea
+                  ref={contentRef}
                   id="content"
                   value={content}
                   onChange={(event) =>
-                    setContent(event.target.value)
+                    setContent(
+                      event.target.value
+                    )
                   }
                   rows={18}
                   required
                   placeholder="Write your full article here..."
-                  className="w-full resize-y rounded-xl border border-white/10 bg-black px-4 py-4 leading-7 text-white outline-none transition placeholder:text-zinc-600 focus:border-cyan-400"
+                  className="w-full resize-y rounded-b-xl border-x border-b border-white/10 bg-black px-4 py-4 leading-7 text-white outline-none transition placeholder:text-zinc-600 focus:border-cyan-400"
                 />
 
-                <p className="mt-2 text-xs text-zinc-600">
-                  Write the complete article content. You can use
-                  paragraphs and line breaks.
-                </p>
+                <div className="mt-2 flex flex-col gap-1 text-xs text-zinc-600 sm:flex-row sm:items-center sm:justify-between">
+                  <p>
+                    Use the toolbar to format headings, emphasis,
+                    lists, and links.
+                  </p>
+
+                  <p>
+                    Minimum 100 characters
+                  </p>
+                </div>
               </div>
 
               {/* Publishing */}
@@ -693,7 +1232,8 @@ export default function CreateArticlePage() {
                       value={status}
                       onChange={(event) =>
                         setStatus(
-                          event.target.value as
+                          event.target
+                            .value as
                             | "draft"
                             | "published"
                         )
@@ -703,6 +1243,7 @@ export default function CreateArticlePage() {
                       <option value="draft">
                         Save as Draft
                       </option>
+
                       <option value="published">
                         Publish Article
                       </option>
@@ -715,7 +1256,10 @@ export default function CreateArticlePage() {
                         type="checkbox"
                         checked={featured}
                         onChange={(event) =>
-                          setFeatured(event.target.checked)
+                          setFeatured(
+                            event.target
+                              .checked
+                          )
                         }
                         className="h-5 w-5 accent-cyan-400"
                       />
@@ -752,7 +1296,9 @@ export default function CreateArticlePage() {
                     Unable to save article
                   </div>
 
-                  <div className="mt-1">{error}</div>
+                  <div className="mt-1">
+                    {error}
+                  </div>
                 </div>
               )}
 
@@ -772,7 +1318,8 @@ export default function CreateArticlePage() {
                 >
                   {saving
                     ? "Saving..."
-                    : status === "published"
+                    : status ===
+                        "published"
                       ? "Publish Article"
                       : "Save Draft"}
                 </button>
