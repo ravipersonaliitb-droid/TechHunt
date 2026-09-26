@@ -361,6 +361,46 @@ function createArticleStructuredData(article: any) {
 }
 
 /* --------------------------------
+   Breadcrumb Structured Data
+--------------------------------- */
+
+function createBreadcrumbStructuredData(article: any) {
+  const articleUrl =
+    `${siteUrl}/article/${article.slug}`;
+
+  const categorySlug =
+    String(article.category ?? "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "-");
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Home",
+        item: siteUrl,
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: article.category,
+        item: `${siteUrl}/category/${categorySlug}`,
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: article.title,
+        item: articleUrl,
+      },
+    ],
+  };
+}
+
+/* --------------------------------
    Article Page
 --------------------------------- */
 
@@ -407,6 +447,9 @@ export default async function ArticlePage({
   const structuredData =
     createArticleStructuredData(article);
 
+  const breadcrumbStructuredData =
+    createBreadcrumbStructuredData(article);
+
   const publishedDate = formatDate(
     article.published_at ??
       article.created_at
@@ -430,6 +473,16 @@ export default async function ArticlePage({
         dangerouslySetInnerHTML={{
           __html: JSON.stringify(
             structuredData
+          ).replace(/</g, "\\u003c"),
+        }}
+      />
+
+      {/* Breadcrumb Structured Data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(
+            breadcrumbStructuredData
           ).replace(/</g, "\\u003c"),
         }}
       />
@@ -465,6 +518,40 @@ export default async function ArticlePage({
 
       {/* Article */}
       <article className="mx-auto max-w-5xl px-5 py-12 lg:py-16">
+        {/* Breadcrumbs */}
+        <nav
+          aria-label="Breadcrumb"
+          className="mb-7 flex flex-wrap items-center gap-2 text-sm text-zinc-500"
+        >
+          <Link
+            href="/"
+            className="transition hover:text-cyan-300"
+          >
+            Home
+          </Link>
+
+          <span aria-hidden="true">/</span>
+
+          <Link
+            href={`/category/${String(article.category ?? "")
+              .trim()
+              .toLowerCase()
+              .replace(/\s+/g, "-")}`}
+            className="font-semibold text-cyan-400 transition hover:text-cyan-300"
+          >
+            {article.category}
+          </Link>
+
+          <span aria-hidden="true">/</span>
+
+          <span
+            aria-current="page"
+            className="max-w-full text-zinc-400"
+          >
+            {article.title}
+          </span>
+        </nav>
+
         {/* Category */}
         <div className="mb-6">
           <span className="inline-flex rounded-full border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.15em] text-cyan-300">
