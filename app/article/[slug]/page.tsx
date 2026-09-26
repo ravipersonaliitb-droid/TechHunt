@@ -112,7 +112,11 @@ export async function generateMetadata({
     };
   }
 
+  const seoTitle =
+    article.seo_title?.trim() || article.title;
+
   const description =
+    article.seo_description?.trim() ||
     article.excerpt ||
     `Read the latest ${article.category} technology story on TechHunt.`;
 
@@ -120,7 +124,7 @@ export async function generateMetadata({
     `${siteUrl}/article/${article.slug}`;
 
   const metadata: Metadata = {
-    title: article.title,
+    title: seoTitle,
 
     description,
 
@@ -153,7 +157,7 @@ export async function generateMetadata({
       type: "article",
       url: articleUrl,
       siteName: "TechHunt",
-      title: article.title,
+      title: seoTitle,
       description,
       locale: "en_IN",
 
@@ -191,7 +195,7 @@ export async function generateMetadata({
         ? "summary_large_image"
         : "summary",
 
-      title: article.title,
+      title: seoTitle,
 
       description,
 
@@ -311,6 +315,7 @@ function createArticleStructuredData(article: any) {
     headline: article.title,
 
     description:
+      article.seo_description?.trim() ||
       article.excerpt ||
       `Read the latest ${article.category} technology story on TechHunt.`,
 

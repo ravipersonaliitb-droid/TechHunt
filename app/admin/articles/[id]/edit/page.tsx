@@ -10,6 +10,8 @@ type Article = {
   slug: string;
   title: string;
   excerpt: string | null;
+  seo_title: string | null;
+  seo_description: string | null;
   content: string;
   category: string;
   author: string;
@@ -29,6 +31,9 @@ const categories = [
   "Research",
 ];
 
+const MAX_SEO_TITLE_LENGTH = 60;
+const MAX_SEO_DESCRIPTION_LENGTH = 160;
+
 export default function EditArticlePage() {
   const params = useParams();
   const router = useRouter();
@@ -42,6 +47,8 @@ export default function EditArticlePage() {
   const [category, setCategory] = useState("AI");
   const [author, setAuthor] = useState("TechHunt");
   const [excerpt, setExcerpt] = useState("");
+  const [seoTitle, setSeoTitle] = useState("");
+  const [seoDescription, setSeoDescription] = useState("");
   const [content, setContent] = useState("");
   const [status, setStatus] =
     useState<"draft" | "published">("draft");
@@ -104,6 +111,8 @@ export default function EditArticlePage() {
       setCategory(loadedArticle.category ?? "AI");
       setAuthor(loadedArticle.author ?? "TechHunt");
       setExcerpt(loadedArticle.excerpt ?? "");
+      setSeoTitle(loadedArticle.seo_title ?? "");
+      setSeoDescription(loadedArticle.seo_description ?? "");
       setContent(loadedArticle.content ?? "");
       setStatus(loadedArticle.status ?? "draft");
       setFeatured(loadedArticle.featured ?? false);
@@ -225,6 +234,25 @@ export default function EditArticlePage() {
       return;
     }
 
+    const cleanSeoTitle = seoTitle.trim();
+    const cleanSeoDescription = seoDescription.trim();
+
+    if (cleanSeoTitle.length > MAX_SEO_TITLE_LENGTH) {
+      setErrorMessage(
+        `SEO title must be ${MAX_SEO_TITLE_LENGTH} characters or fewer.`
+      );
+      setSaving(false);
+      return;
+    }
+
+    if (cleanSeoDescription.length > MAX_SEO_DESCRIPTION_LENGTH) {
+      setErrorMessage(
+        `SEO description must be ${MAX_SEO_DESCRIPTION_LENGTH} characters or fewer.`
+      );
+      setSaving(false);
+      return;
+    }
+
     try {
       const supabase = createClient();
 
@@ -242,6 +270,8 @@ export default function EditArticlePage() {
           category,
           author: author.trim() || "TechHunt",
           excerpt: excerpt.trim() || null,
+          seo_title: cleanSeoTitle || null,
+          seo_description: cleanSeoDescription || null,
           content: content.trim(),
           status,
           featured,
@@ -501,6 +531,79 @@ export default function EditArticlePage() {
                   className="w-full resize-y rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none placeholder:text-zinc-700 focus:border-cyan-400/50"
                   placeholder="Write a short summary of the article..."
                 />
+              </div>
+
+              {/* SEO */}
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-4">
+                  <label
+                    htmlFor="seoTitle"
+                    className="block text-sm font-medium text-zinc-300"
+                  >
+                    SEO Title
+                  </label>
+                  <span
+                    className={`text-xs ${
+                      seoTitle.length > MAX_SEO_TITLE_LENGTH
+                        ? "text-red-400"
+                        : "text-zinc-500"
+                    }`}
+                  >
+                    {seoTitle.length}/{MAX_SEO_TITLE_LENGTH}
+                  </span>
+                </div>
+
+                <input
+                  id="seoTitle"
+                  type="text"
+                  value={seoTitle}
+                  onChange={(event) => setSeoTitle(event.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none transition placeholder:text-zinc-700 focus:border-cyan-400/50"
+                  placeholder={title || "SEO-friendly article title"}
+                  maxLength={MAX_SEO_TITLE_LENGTH}
+                />
+
+                <p className="mt-2 text-xs text-zinc-600">
+                  Optional. Leave blank to use the article title.
+                </p>
+              </div>
+
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-4">
+                  <label
+                    htmlFor="seoDescription"
+                    className="block text-sm font-medium text-zinc-300"
+                  >
+                    SEO Description
+                  </label>
+                  <span
+                    className={`text-xs ${
+                      seoDescription.length > MAX_SEO_DESCRIPTION_LENGTH
+                        ? "text-red-400"
+                        : "text-zinc-500"
+                    }`}
+                  >
+                    {seoDescription.length}/{MAX_SEO_DESCRIPTION_LENGTH}
+                  </span>
+                </div>
+
+                <textarea
+                  id="seoDescription"
+                  value={seoDescription}
+                  onChange={(event) =>
+                    setSeoDescription(event.target.value)
+                  }
+                  rows={4}
+                  className="w-full resize-y rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none placeholder:text-zinc-700 focus:border-cyan-400/50"
+                  placeholder={
+                    excerpt || "Write a search-friendly description..."
+                  }
+                  maxLength={MAX_SEO_DESCRIPTION_LENGTH}
+                />
+
+                <p className="mt-2 text-xs text-zinc-600">
+                  Optional. Leave blank to use the article excerpt.
+                </p>
               </div>
 
               {/* Article Image */}
