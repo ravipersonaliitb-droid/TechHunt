@@ -1,6 +1,4 @@
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
+import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -11,6 +9,54 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { supabase } from "../lib/supabase/server";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+const siteUrl = "https://tech-hunt-iota.vercel.app";
+
+export const metadata: Metadata = {
+  title: "TechHunt — Technology. Innovation. What's Next.",
+  description:
+    "TechHunt covers AI, Indian and global technology, startups, gadgets, cybersecurity and research with the latest technology news and insights.",
+  alternates: {
+    canonical: siteUrl,
+  },
+  keywords: [
+    "TechHunt",
+    "technology news",
+    "AI news",
+    "India tech",
+    "gadgets",
+    "startups",
+    "cybersecurity",
+    "software",
+    "technology research",
+  ],
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+    },
+  },
+  openGraph: {
+    type: "website",
+    url: siteUrl,
+    siteName: "TechHunt",
+    title: "TechHunt — Technology. Innovation. What's Next.",
+    description:
+      "TechHunt covers AI, Indian and global technology, startups, gadgets, cybersecurity and research with the latest technology news and insights.",
+    locale: "en_IN",
+  },
+  twitter: {
+    card: "summary",
+    title: "TechHunt — Technology. Innovation. What's Next.",
+    description:
+      "TechHunt covers AI, Indian and global technology, startups, gadgets, cybersecurity and research with the latest technology news and insights.",
+  },
+};
 
 const categories = [
   { name: "All", slug: "" },
@@ -88,8 +134,56 @@ export default async function Home() {
     .filter((story) => story.slug !== featuredArticle?.slug)
     .slice(0, 4);
 
+  /*
+   * HOMEPAGE STRUCTURED DATA
+   *
+   * WebSite structured data helps Google understand
+   * the preferred name of the website.
+   */
+  const websiteStructuredData = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "TechHunt",
+    alternateName: "Tech Hunt",
+    url: siteUrl,
+    inLanguage: "en-IN",
+  };
+
+  /*
+   * ORGANIZATION STRUCTURED DATA
+   *
+   * This identifies TechHunt as the organization/site
+   * associated with the homepage.
+   */
+  const organizationStructuredData = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "TechHunt",
+    url: siteUrl,
+  };
+
   return (
     <main className="min-h-screen bg-[#07090d] text-white">
+      {/* Homepage WebSite Structured Data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(
+            websiteStructuredData
+          ).replace(/</g, "\\u003c"),
+        }}
+      />
+
+      {/* Homepage Organization Structured Data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(
+            organizationStructuredData
+          ).replace(/</g, "\\u003c"),
+        }}
+      />
+
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-white/10 bg-[#07090d]/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
