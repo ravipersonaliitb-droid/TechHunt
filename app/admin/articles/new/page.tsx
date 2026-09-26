@@ -23,6 +23,8 @@ const categories = [
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 const MAX_TITLE_LENGTH = 120;
 const MAX_EXCERPT_LENGTH = 300;
+const MAX_SEO_TITLE_LENGTH = 60;
+const MAX_SEO_DESCRIPTION_LENGTH = 160;
 
 export default function CreateArticlePage() {
   const router = useRouter();
@@ -33,6 +35,8 @@ export default function CreateArticlePage() {
   const [category, setCategory] = useState("AI");
   const [author, setAuthor] = useState("TechHunt");
   const [excerpt, setExcerpt] = useState("");
+  const [seoTitle, setSeoTitle] = useState("");
+  const [seoDescription, setSeoDescription] = useState("");
   const [content, setContent] = useState("");
 
   const [status, setStatus] = useState<"draft" | "published">(
@@ -52,6 +56,8 @@ export default function CreateArticlePage() {
 
   const titleCount = title.length;
   const excerptCount = excerpt.length;
+  const seoTitleCount = seoTitle.length;
+  const seoDescriptionCount = seoDescription.length;
 
   const wordCount = content.trim()
     ? content.trim().split(/\s+/).length
@@ -522,6 +528,8 @@ export default function CreateArticlePage() {
       const cleanTitle = title.trim();
       const cleanSlug = slug.trim();
       const cleanExcerpt = excerpt.trim();
+      const cleanSeoTitle = seoTitle.trim();
+      const cleanSeoDescription = seoDescription.trim();
       const cleanContent = content.trim();
 
       const cleanAuthor =
@@ -564,6 +572,21 @@ export default function CreateArticlePage() {
       if (cleanExcerpt.length < 30) {
         throw new Error(
           "Article excerpt should contain at least 30 characters."
+        );
+      }
+
+      if (cleanSeoTitle.length > MAX_SEO_TITLE_LENGTH) {
+        throw new Error(
+          `SEO title must be ${MAX_SEO_TITLE_LENGTH} characters or fewer.`
+        );
+      }
+
+      if (
+        cleanSeoDescription.length >
+        MAX_SEO_DESCRIPTION_LENGTH
+      ) {
+        throw new Error(
+          `SEO description must be ${MAX_SEO_DESCRIPTION_LENGTH} characters or fewer.`
         );
       }
 
@@ -634,6 +657,8 @@ export default function CreateArticlePage() {
           slug: cleanSlug,
           title: cleanTitle,
           excerpt: cleanExcerpt,
+          seo_title: cleanSeoTitle || null,
+          seo_description: cleanSeoDescription || null,
           content: cleanContent,
           category,
           author: cleanAuthor,
@@ -974,6 +999,104 @@ export default function CreateArticlePage() {
                   This summary can appear on article cards and
                   search results.
                 </p>
+              </div>
+
+              {/* SEO */}
+              <div className="rounded-2xl border border-cyan-400/10 bg-cyan-400/[0.03] p-5">
+                <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
+                  <div>
+                    <h3 className="text-lg font-semibold">
+                      Search Engine Optimization
+                    </h3>
+
+                    <p className="mt-1 text-sm text-zinc-500">
+                      Optional metadata used for search engines and social sharing.
+                    </p>
+                  </div>
+
+                  <span className="text-xs text-zinc-600">
+                    Leave blank to use the article title and excerpt.
+                  </span>
+                </div>
+
+                <div className="mt-5 space-y-6">
+                  <div>
+                    <div className="mb-2 flex items-center justify-between">
+                      <label
+                        htmlFor="seoTitle"
+                        className="block text-sm font-medium"
+                      >
+                        SEO Title
+                      </label>
+
+                      <span
+                        className={`text-xs ${
+                          seoTitleCount >= MAX_SEO_TITLE_LENGTH
+                            ? "text-red-400"
+                            : "text-zinc-600"
+                        }`}
+                      >
+                        {seoTitleCount}/{MAX_SEO_TITLE_LENGTH}
+                      </span>
+                    </div>
+
+                    <input
+                      id="seoTitle"
+                      type="text"
+                      value={seoTitle}
+                      maxLength={MAX_SEO_TITLE_LENGTH}
+                      onChange={(event) =>
+                        setSeoTitle(event.target.value)
+                      }
+                      placeholder={title || "Search-friendly article title"}
+                      className="w-full rounded-xl border border-white/10 bg-black px-4 py-4 text-white outline-none transition placeholder:text-zinc-600 focus:border-cyan-400"
+                    />
+
+                    <p className="mt-2 text-xs text-zinc-600">
+                      Recommended: keep it concise and closely related to the article title.
+                    </p>
+                  </div>
+
+                  <div>
+                    <div className="mb-2 flex items-center justify-between">
+                      <label
+                        htmlFor="seoDescription"
+                        className="block text-sm font-medium"
+                      >
+                        SEO Description
+                      </label>
+
+                      <span
+                        className={`text-xs ${
+                          seoDescriptionCount >= MAX_SEO_DESCRIPTION_LENGTH
+                            ? "text-red-400"
+                            : "text-zinc-600"
+                        }`}
+                      >
+                        {seoDescriptionCount}/{MAX_SEO_DESCRIPTION_LENGTH}
+                      </span>
+                    </div>
+
+                    <textarea
+                      id="seoDescription"
+                      value={seoDescription}
+                      maxLength={MAX_SEO_DESCRIPTION_LENGTH}
+                      rows={3}
+                      onChange={(event) =>
+                        setSeoDescription(event.target.value)
+                      }
+                      placeholder={
+                        excerpt ||
+                        "Write a concise description of the article for search and sharing."
+                      }
+                      className="w-full resize-y rounded-xl border border-white/10 bg-black px-4 py-4 leading-7 text-white outline-none transition placeholder:text-zinc-600 focus:border-cyan-400"
+                    />
+
+                    <p className="mt-2 text-xs text-zinc-600">
+                      Recommended: summarize the article clearly in one or two sentences.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {/* Image */}
