@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import ShareButton from "./ShareButton";
 import { supabase } from "../../../lib/supabase/server";
 
@@ -15,6 +15,10 @@ const siteUrl = "https://tech-hunt-iota.vercel.app";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+/* --------------------------------
+   Article Data
+--------------------------------- */
+
 async function getArticle(slug: string) {
   const { data: article, error } = await supabase
     .from("articles")
@@ -28,6 +32,59 @@ async function getArticle(slug: string) {
   }
 
   return article;
+}
+
+async function getRelatedArticles(
+  currentSlug: string,
+  currentCategory: string
+) {
+  const { data: articles, error } = await supabase
+    .from("articles")
+    .select(
+      "id, slug, title, excerpt, category, image_url, published_at, created_at"
+    )
+    .eq("status", "published")
+    .neq("slug", currentSlug)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  if (error) {
+    console.error("Failed to load related articles:", error);
+    return [];
+  }
+
+  const sortedArticles = [...(articles ?? [])].sort((a, b) => {
+    const aSameCategory = a.category === currentCategory ? 1 : 0;
+    const bSameCategory = b.category === currentCategory ? 1 : 0;
+
+    if (aSameCategory !== bSameCategory) {
+      return bSameCategory - aSameCategory;
+    }
+
+    const aDate = new Date(
+      a.published_at ?? a.created_at
+    ).getTime();
+
+    const bDate = new Date(
+      b.published_at ?? b.created_at
+    ).getTime();
+
+    return bDate - aDate;
+  });
+
+  return sortedArticles.slice(0, 3);
+}
+
+/* --------------------------------
+   Date Helper
+--------------------------------- */
+
+function formatDate(dateValue: string) {
+  return new Date(dateValue).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 }
 
 /* --------------------------------
@@ -145,16 +202,30 @@ export async function generateMetadata({
    Article Content Helpers
 --------------------------------- */
 
-function isHeading(text: string) {
+function getHeadingLevel(text: string) {
   const clean = text.trim();
 
-  if (!clean) return false;
+  if (clean.startsWith("### ")) return 3;
+  if (clean.startsWith("## ")) return 2;
 
-  return (
+  /*
+    Preserve the previous behavior for headings
+    that were written without Markdown markers.
+  */
+  if (
+    clean &&
     clean.length <= 80 &&
     !/[.!?,;:]$/.test(clean) &&
     !clean.includes("→")
-  );
+  ) {
+    return 2;
+  }
+
+  return 0;
+}
+
+function cleanHeadingText(text: string) {
+  return text.trim().replace(/^#{2,3}\s+/, "");
 }
 
 /* --------------------------------
@@ -273,15 +344,16 @@ export default async function ArticlePage({
     );
   }
 
+  const relatedArticles = await getRelatedArticles(
+    article.slug,
+    article.category
+  );
+
   const structuredData = createArticleStructuredData(article);
 
-  const publishedDate = new Date(
+  const publishedDate = formatDate(
     article.published_at ?? article.created_at
-  ).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  );
 
   const paragraphs = article.content
     .split(/\n\s*\n/)
@@ -348,7 +420,7 @@ export default async function ArticlePage({
           <span>
             By{" "}
             <span className="font-semibold text-zinc-300">
-              {article.author}
+              {article.author || "TechHunt"}
             </span>
           </span>
 
@@ -391,19 +463,31 @@ export default async function ArticlePage({
         )}
 
         {/* Article Content */}
-        <div className="mx-auto mt-14 max-w-3xl">
-          <div className="space-y-8">
+        <div className="mx-auto mt-14 max-w-5xl">
+          <div className="mx-auto max-w-3xl space-y-8">
             {paragraphs.map(
               (paragraph: string, index: number) => {
-                const heading = isHeading(paragraph);
+                const headingLevel = getHeadingLevel(paragraph);
+                const headingText = cleanHeadingText(paragraph);
 
-                if (heading) {
+                if (headingLevel === 3) {
+                  return (
+                    <h3
+                      key={index}
+                      className="pt-5 text-xl font-black leading-tight tracking-tight text-white sm:text-2xl"
+                    >
+                      {headingText}
+                    </h3>
+                  );
+                }
+
+                if (headingLevel === 2) {
                   return (
                     <h2
                       key={index}
                       className="pt-5 text-2xl font-black leading-tight tracking-tight text-white sm:text-3xl"
                     >
-                      {paragraph}
+                      {headingText}
                     </h2>
                   );
                 }
@@ -419,6 +503,89 @@ export default async function ArticlePage({
               }
             )}
           </div>
+
+          {/* Related Articles */}
+          {relatedArticles.length > 0 && (
+            <section className="mt-20 border-t border-white/10 pt-12">
+              <div className="mb-7 flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-400">
+                    Keep Reading
+                  </p>
+
+                  <h2 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
+                    You May Also Like
+                  </h2>
+                </div>
+              </div>
+
+              <div className="grid gap-6 md:grid-cols-3">
+                {relatedArticles.map((relatedArticle) => (
+                  <Link
+                    key={relatedArticle.id ?? relatedArticle.slug}
+                    href={`/article/${relatedArticle.slug}`}
+                    className="group overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] transition duration-300 hover:-translate-y-1 hover:border-cyan-400/30 hover:bg-white/[0.05]"
+                  >
+                    {/* Card Image */}
+                    <div className="relative aspect-[16/10] overflow-hidden bg-[#10141c]">
+                      {relatedArticle.image_url ? (
+                        <img
+                          src={relatedArticle.image_url}
+                          alt={relatedArticle.title}
+                          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="article-hero h-full">
+                          <div className="article-hero-grid" />
+                          <div className="article-orb" />
+
+                          <div className="relative z-10 flex h-full items-end p-5">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400">
+                              TechHunt
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="absolute left-3 top-3">
+                        <span className="rounded-full border border-cyan-400/30 bg-black/70 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-300 backdrop-blur-md">
+                          {relatedArticle.category}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Card Content */}
+                    <div className="p-5">
+                      <p className="text-xs text-zinc-500">
+                        {formatDate(
+                          relatedArticle.published_at ??
+                            relatedArticle.created_at
+                        )}
+                      </p>
+
+                      <h3 className="mt-2 line-clamp-3 text-lg font-black leading-tight text-white transition group-hover:text-cyan-300">
+                        {relatedArticle.title}
+                      </h3>
+
+                      {relatedArticle.excerpt && (
+                        <p className="mt-3 line-clamp-2 text-sm leading-6 text-zinc-500">
+                          {relatedArticle.excerpt}
+                        </p>
+                      )}
+
+                      <div className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-cyan-400">
+                        Read article
+                        <ArrowRight
+                          size={15}
+                          className="transition-transform duration-300 group-hover:translate-x-1"
+                        />
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* Bottom Navigation */}
           <div className="mt-16 border-t border-white/10 pt-8">
